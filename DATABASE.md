@@ -5,7 +5,8 @@
 
 ## 1. Tổng Quan Kiến Trúc CSDL
 - **Hệ quản trị CSDL:** PostgreSQL (v18.6)
-- **Extensions bắt buộc:** `unaccent`, `pg_trgm` (tìm kiếm tiếng Việt không dấu, tạo trong `schema.sql`); `pgcrypto` (băm mật khẩu trong `seed.sql`).
+- **Extensions bắt buộc:** `unaccent`, `pg_trgm` (tìm kiếm tiếng Việt không dấu, tạo trong migration `0_init`); `pgcrypto` (băm mật khẩu trong `seed.sql`).
+- **Công cụ:** Docker Compose (chạy PostgreSQL), Prisma 7.10.1 (migration + Prisma Client).
 - **Thiết kế:** Đạt chuẩn 3NF, gồm **13 bảng (v1.0)**. Các bảng v2.0 (phương tiện, thu hộ) chưa nằm trong schema này.
 
 ### Quy ước chung
@@ -31,7 +32,7 @@
   - `trang_thai`: `DANG_O` | `DA_CHUYEN_DI`.
   - Mỗi căn hộ có tối đa 1 hộ `DANG_O` (partial unique index `uq_ho_gia_dinh_can_ho_dang_o`); các hộ đã chuyển đi được giữ lại làm lịch sử.
 - `nhan_khau`: Cư dân trong hộ. Số CCCD duy nhất (trẻ em dưới 14 tuổi có thể NULL).
-  - `trang_thai`: `THUONG_TRU` | `TAM_TRU` | `TAM_VANG` | `DA_CHUYEN_DI`.
+  - `trang_thai`: `THUONG_TRU` | `TAM_TRU` | `TAM_VANG` | `DA_CHUYEN_DI` | `DA_QUA_DOI` (sau biến động `QUA_DOI`).
   - Mỗi hộ có **tối đa** 1 chủ hộ (partial unique index `uq_nhan_khau_chu_ho`). Việc hộ phải có chủ hộ do backend kiểm tra. Khi đổi chủ hộ: bỏ cờ chủ hộ cũ trước, đặt cờ chủ hộ mới sau, trong cùng một transaction.
 - `bien_dong_nhan_khau`: Lịch sử biến động, không xóa cứng (`US10`).
   - `loai_bien_dong`: `SINH_MOI` | `CHUYEN_DEN` | `CHUYEN_DI` | `QUA_DOI` | `DOI_CHU_HO`.
@@ -54,24 +55,16 @@
 
 ---
 
-## 3. Hướng Dẫn Khởi Tạo CSDL Máy Local
+## 3. Khởi Tạo CSDL Máy Local
+Xem các bước cài đặt trong [README.md](./README.md#cài-đặt-csdl-lần-đầu). Tóm tắt:
+`cp .env.example .env` → `npm run db:up` → `npm install` → `npm run db:deploy` → `npm run db:seed` (tất cả trong `backend/`).
 
-### Bước 1: Tạo Database
-Mở **pgAdmin** hoặc terminal `psql`:
-```sql
-CREATE DATABASE bluemoon_db WITH OWNER = postgres ENCODING = 'UTF8';
-```
-
-### Bước 2: Chạy Script SQL
-Mở Query Tool trên database `bluemoon_db` và chạy lần lượt các file:
-1. `database/schema.sql`: tạo extension, bảng, ràng buộc, hàm & index.
-2. `database/seed.sql`: chèn dữ liệu mẫu thử nghiệm.
-
-Hoặc dùng `psql`:
-```bash
-psql -U postgres -d bluemoon_db -v ON_ERROR_STOP=1 -f database/schema.sql
-psql -U postgres -d bluemoon_db -v ON_ERROR_STOP=1 -f database/seed.sql
-```
+| File | Vai trò |
+|---|---|
+| `docker-compose.yml` | PostgreSQL 18, cổng 5433, dữ liệu lưu trong volume `pgdata` |
+| `backend/prisma/migrations/*/migration.sql` | **Nguồn sự thật** của cấu trúc CSDL, chạy theo thứ tự |
+| `backend/prisma/schema.prisma` | Mô tả lại CSDL để sinh Prisma Client (không đầy đủ, xem mục 4) |
+| `backend/prisma/seed.sql` | Dữ liệu mẫu, chỉ dùng cho máy dev |
 
 ### Dữ liệu mẫu
 - Tài khoản Admin: `admin` / `Admin@123`. Chỉ dùng cho môi trường phát triển, **đổi mật khẩu** sau lần đăng nhập đầu tiên.
@@ -84,3 +77,30 @@ Index `idx_nhan_khau_ho_ten_trgm` hỗ trợ tìm tên không phân biệt dấu
 SELECT * FROM nhan_khau
 WHERE public.immutable_unaccent(ho_ten) ILIKE '%' || public.immutable_unaccent('tuan') || '%';
 ```
+
+---
+
+## 4. Thay Đổi Cấu Trúc CSDL
+
+### Những thứ có trong CSDL nhưng KHÔNG có trong `schema.prisma`
+Prisma không biểu diễn được các đối tượng sau, nên chúng chỉ tồn tại trong file migration SQL:
+- Toàn bộ **CHECK** (giá trị `trang_thai`/`loai_*`, số tiền > 0, định dạng `ky_thu`, `chk_chi_tiet_mot_nguon`…).
+- Index trên biểu thức `idx_nhan_khau_ho_ten_trgm`, function `immutable_unaccent`, các extension.
+
+Prisma **bỏ qua** chúng (không xóa), nhưng cũng **không tự sinh** chúng cho thay đổi mới.
+
+### Quy trình
+1. Sửa `backend/prisma/schema.prisma`.
+2. `npm run db:migrate -- --name ten_thay_doi --create-only` → mở file `migration.sql` vừa sinh ra và kiểm tra:
+   - Không có `DROP` ngoài ý muốn.
+   - Thêm bằng tay CHECK / index đặc biệt nếu cần.
+3. `npm run db:migrate` để áp dụng, rồi `npm run db:generate`.
+4. Commit cả thư mục migration mới lẫn `schema.prisma`.
+
+**Không bao giờ sửa** migration đã commit. Prisma lưu checksum từng file trong bảng `_prisma_migrations` và sẽ báo lỗi. Muốn đổi thì tạo migration mới.
+
+### Lưu ý khi dùng Prisma Client
+- `HoGiaDinh.canHoId` và `NhanKhau.hoGiaDinhId` là **partial unique** (preview feature `partialIndexes`). Khi `findUnique` theo hai cột này **phải** kèm điều kiện của index:
+  `findUnique({ where: { canHoId, trangThai: 'DANG_O' } })`, `findUnique({ where: { hoGiaDinhId, isChuHo: true } })`.
+  Nếu thiếu, kết quả có thể là hộ đã chuyển đi hoặc một nhân khẩu bất kỳ.
+- Cột tiền (`BIGINT`) trả về kiểu `BigInt` trong JavaScript, `JSON.stringify` không xử lý được kiểu này (sẽ có hướng dẫn riêng).

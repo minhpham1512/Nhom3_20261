@@ -1,4 +1,4 @@
--- DỮ LIỆU MẪU CHO MÔI TRƯỜNG PHÁT TRIỂN (chạy sau schema.sql)
+-- DỮ LIỆU MẪU CHO MÔI TRƯỜNG PHÁT TRIỂN (chạy sau khi đã migrate: npm run db:deploy)
 -- Toàn bộ họ tên và số CCCD dưới đây là HƯ CẤU, chỉ dùng để thử nghiệm.
 -- Không gắn cứng id: mọi khóa ngoại được tra qua mã nghiệp vụ (ma_can_ho, ma_ho_khau, ten_vai_tro).
 

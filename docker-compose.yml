@@ -1,0 +1,22 @@
+name: bluemoon
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres     # chỉ dùng cho máy dev
+      POSTGRES_DB: bluemoon_db
+    ports:
+      - "127.0.0.1:5433:5432"         # máy:container — 5433 trên máy bạn → 5432 trong container
+    volumes:
+      - pgdata:/var/lib/postgresql    # từ bản 18, gắn vào thư mục cha (không phải .../data)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bluemoon_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -81,7 +81,7 @@ CREATE TABLE nhan_khau (
     quan_he_chu_ho VARCHAR(50) NOT NULL, -- Chủ hộ, Vợ, Chồng, Con...
     is_chu_ho BOOLEAN NOT NULL DEFAULT FALSE,
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'THUONG_TRU'
-        CHECK (trang_thai IN ('THUONG_TRU', 'TAM_TRU', 'TAM_VANG', 'DA_CHUYEN_DI')),
+        CHECK (trang_thai IN ('THUONG_TRU', 'TAM_TRU', 'TAM_VANG', 'DA_CHUYEN_DI', 'DA_QUA_DOI')),
     ngay_tao TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
