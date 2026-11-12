@@ -1,0 +1,223 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// LƯU Ý: Nguồn sự thật của cấu trúc CSDL là các file prisma/migrations/*/migration.sql.
+// File này chỉ mô tả lại để sinh Prisma Client. Những thứ KHÔNG có ở đây nhưng VẪN tồn tại trong CSDL:
+// CHECK constraint, index trên biểu thức (idx_nhan_khau_ho_ten_trgm), function immutable_unaccent,
+// extension unaccent/pg_trgm/pgcrypto. Xem DATABASE.md.
+
+// ===== QUẢN TRỊ & BẢO MẬT (EP01) =====
+
+model VaiTro {
+  id        Int        @id @default(autoincrement())
+  tenVaiTro String     @unique @map("ten_vai_tro") @db.VarChar(50)
+  moTa      String?    @map("mo_ta")
+  taiKhoan  TaiKhoan[]
+
+  @@map("vai_tro")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model TaiKhoan {
+  id                 Int                @id @default(autoincrement())
+  tenDangNhap        String             @unique @map("ten_dang_nhap") @db.VarChar(50)
+  matKhauHash        String             @map("mat_khau_hash") @db.VarChar(255)
+  hoTen              String             @map("ho_ten") @db.VarChar(100)
+  soDienThoai        String?            @map("so_dien_thoai") @db.VarChar(15)
+  email              String?            @db.VarChar(100)
+  vaiTroId           Int                @map("vai_tro_id")
+  trangThai          String             @default("ACTIVE") @map("trang_thai") @db.VarChar(20)
+  soLanSaiMatKhau    Int                @default(0) @map("so_lan_sai_mat_khau")
+  khoaDenThoiGian    DateTime?          @map("khoa_den_thoi_gian") @db.Timestamptz(6)
+  ngayTao            DateTime           @default(now()) @map("ngay_tao") @db.Timestamptz(6)
+  bienDongDaThucHien BienDongNhanKhau[]
+  nhatKyThaoTac      NhatKyThaoTac[]
+  phieuThuDaThu      PhieuThu[]
+  vaiTro             VaiTro             @relation(fields: [vaiTroId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("tai_khoan")
+}
+
+model NhatKyThaoTac {
+  id         BigInt    @id @default(autoincrement())
+  taiKhoanId Int?      @map("tai_khoan_id")
+  hanhDong   String    @map("hanh_dong") @db.VarChar(100)
+  tenBang    String    @map("ten_bang") @db.VarChar(50)
+  duLieuCu   Json?     @map("du_lieu_cu")
+  duLieuMoi  Json?     @map("du_lieu_moi")
+  thoiGian   DateTime  @default(now()) @map("thoi_gian") @db.Timestamptz(6)
+  taiKhoan   TaiKhoan? @relation(fields: [taiKhoanId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("nhat_ky_thao_tac")
+}
+
+// ===== HỘ GIA ĐÌNH & NHÂN KHẨU (EP02) =====
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model CanHo {
+  id        Int         @id @default(autoincrement())
+  maCanHo   String      @unique @map("ma_can_ho") @db.VarChar(20)
+  dienTich  Decimal     @map("dien_tich") @db.Decimal(8, 2)
+  tang      Int?
+  moTa      String?     @map("mo_ta")
+  // Một căn hộ có nhiều hộ theo thời gian (lịch sử), tối đa 1 hộ DANG_O
+  hoGiaDinh HoGiaDinh[]
+
+  @@map("can_ho")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model HoGiaDinh {
+  id            Int          @id @default(autoincrement())
+  // Partial unique: chỉ duy nhất trong các hộ DANG_O.
+  // Khi findUnique theo canHoId PHẢI kèm trangThai: 'DANG_O'.
+  canHoId       Int          @unique(map: "uq_ho_gia_dinh_can_ho_dang_o", where: raw("((trang_thai)::text = 'DANG_O'::text)")) @map("can_ho_id")
+  maHoKhau      String       @unique @map("ma_ho_khau") @db.VarChar(50)
+  ngayChuyenDen DateTime     @default(dbgenerated("CURRENT_DATE")) @map("ngay_chuyen_den") @db.Date
+  trangThai     String       @default("DANG_O") @map("trang_thai") @db.VarChar(20)
+  canHo         CanHo        @relation(fields: [canHoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nhanKhau      NhanKhau[]
+  phiPhaiNop    PhiPhaiNop[]
+  phieuThu      PhieuThu[]
+
+  @@map("ho_gia_dinh")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model NhanKhau {
+  id               Int                @id @default(autoincrement())
+  // Partial unique: chỉ duy nhất trong các nhân khẩu là chủ hộ.
+  // Khi findUnique theo hoGiaDinhId PHẢI kèm isChuHo: true.
+  hoGiaDinhId      Int                @unique(map: "uq_nhan_khau_chu_ho", where: raw("is_chu_ho")) @map("ho_gia_dinh_id")
+  hoTen            String             @map("ho_ten") @db.VarChar(100)
+  ngaySinh         DateTime           @map("ngay_sinh") @db.Date
+  gioiTinh         String             @map("gioi_tinh") @db.VarChar(10)
+  soCccd           String?            @unique @map("so_cccd") @db.VarChar(20)
+  quanHeChuHo      String             @map("quan_he_chu_ho") @db.VarChar(50)
+  isChuHo          Boolean            @default(false) @map("is_chu_ho")
+  trangThai        String             @default("THUONG_TRU") @map("trang_thai") @db.VarChar(20)
+  ngayTao          DateTime           @default(now()) @map("ngay_tao") @db.Timestamptz(6)
+  bienDongNhanKhau BienDongNhanKhau[]
+  hoGiaDinh        HoGiaDinh          @relation(fields: [hoGiaDinhId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tamTruTamVang    TamTruTamVang[]
+
+  @@map("nhan_khau")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model BienDongNhanKhau {
+  id              Int      @id @default(autoincrement())
+  nhanKhauId      Int      @map("nhan_khau_id")
+  loaiBienDong    String   @map("loai_bien_dong") @db.VarChar(50)
+  ngayBienDong    DateTime @default(dbgenerated("CURRENT_DATE")) @map("ngay_bien_dong") @db.Date
+  ghiChu          String?  @map("ghi_chu")
+  nguoiThucHienId Int      @map("nguoi_thuc_hien_id")
+  nguoiThucHien   TaiKhoan @relation(fields: [nguoiThucHienId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nhanKhau        NhanKhau @relation(fields: [nhanKhauId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("bien_dong_nhan_khau")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model TamTruTamVang {
+  id             Int      @id @default(autoincrement())
+  nhanKhauId     Int      @map("nhan_khau_id")
+  loaiKhaiBao    String   @map("loai_khai_bao") @db.VarChar(20)
+  tuNgay         DateTime @map("tu_ngay") @db.Date
+  denNgay        DateTime @map("den_ngay") @db.Date
+  lyDo           String?  @map("ly_do")
+  diaChiLienQuan String?  @map("dia_chi_lien_quan")
+  nhanKhau       NhanKhau @relation(fields: [nhanKhauId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("tam_tru_tam_vang")
+}
+
+// ===== KHOẢN THU & THU PHÍ (EP03, EP04, EP05) — mọi cột tiền là BIGINT, đơn vị đồng =====
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model KhoanThu {
+  id           Int          @id @default(autoincrement())
+  tenKhoanThu  String       @map("ten_khoan_thu") @db.VarChar(100)
+  loaiKhoanThu String       @map("loai_khoan_thu") @db.VarChar(30)
+  donGia       BigInt       @default(0) @map("don_gia")
+  donViTinh    String       @default("VND/m2/thang") @map("don_vi_tinh") @db.VarChar(20)
+  ngayApDung   DateTime     @default(dbgenerated("CURRENT_DATE")) @map("ngay_ap_dung") @db.Date
+  trangThai    String       @default("HOAT_DONG") @map("trang_thai") @db.VarChar(20)
+  dotDongGop   DotDongGop[]
+  phiPhaiNop   PhiPhaiNop[]
+
+  @@map("khoan_thu")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model DotDongGop {
+  id              Int               @id @default(autoincrement())
+  khoanThuId      Int               @map("khoan_thu_id")
+  tenDot          String            @map("ten_dot") @db.VarChar(150)
+  ngayBatDau      DateTime          @map("ngay_bat_dau") @db.Date
+  ngayKetThuc     DateTime          @map("ngay_ket_thuc") @db.Date
+  chiTietPhieuThu ChiTietPhieuThu[]
+  khoanThu        KhoanThu          @relation(fields: [khoanThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("dot_dong_gop")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PhiPhaiNop {
+  id              Int               @id @default(autoincrement())
+  hoGiaDinhId     Int               @map("ho_gia_dinh_id")
+  khoanThuId      Int               @map("khoan_thu_id")
+  kyThu           String            @map("ky_thu") @db.VarChar(7)
+  soTienPhaiNop   BigInt            @map("so_tien_phai_nop")
+  soTienDaNop     BigInt            @default(0) @map("so_tien_da_nop")
+  trangThai       String            @default("CHUA_NOP") @map("trang_thai") @db.VarChar(20)
+  chiTietPhieuThu ChiTietPhieuThu[]
+  hoGiaDinh       HoGiaDinh         @relation(fields: [hoGiaDinhId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  khoanThu        KhoanThu          @relation(fields: [khoanThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([hoGiaDinhId, khoanThuId, kyThu], map: "unique_phi_ho_ky")
+  @@index([kyThu, trangThai], map: "idx_phi_phai_nop_ky")
+  @@map("phi_phai_nop")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PhieuThu {
+  id              Int               @id @default(autoincrement())
+  soPhieu         String            @unique @map("so_phieu") @db.VarChar(50)
+  hoGiaDinhId     Int               @map("ho_gia_dinh_id")
+  nguoiNopTien    String            @map("nguoi_nop_tien") @db.VarChar(100)
+  tongTien        BigInt            @map("tong_tien")
+  ngayThu         DateTime          @default(now()) @map("ngay_thu") @db.Timestamptz(6)
+  nguoiThuId      Int               @map("nguoi_thu_id")
+  trangThai       String            @default("HOP_LE") @map("trang_thai") @db.VarChar(20)
+  lyDoHuy         String?           @map("ly_do_huy")
+  chiTietPhieuThu ChiTietPhieuThu[]
+  hoGiaDinh       HoGiaDinh         @relation(fields: [hoGiaDinhId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoiThu        TaiKhoan          @relation(fields: [nguoiThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([hoGiaDinhId, ngayThu], map: "idx_phieu_thu_ho")
+  @@map("phieu_thu")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ChiTietPhieuThu {
+  id           Int         @id @default(autoincrement())
+  phieuThuId   Int         @map("phieu_thu_id")
+  // Đúng 1 trong 2 cột dưới khác NULL (CHECK chk_chi_tiet_mot_nguon trong CSDL)
+  phiPhaiNopId Int?        @map("phi_phai_nop_id")
+  dotDongGopId Int?        @map("dot_dong_gop_id")
+  soTien       BigInt      @map("so_tien")
+  dotDongGop   DotDongGop? @relation(fields: [dotDongGopId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  phiPhaiNop   PhiPhaiNop? @relation(fields: [phiPhaiNopId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  phieuThu     PhieuThu    @relation(fields: [phieuThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("chi_tiet_phieu_thu")
+}

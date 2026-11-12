@@ -5,13 +5,35 @@ info:
   description: |
     Đặc tả API cho phần mềm quản lý cư dân và thu phí chung cư BlueMoon.
 
+    ## Xác thực (session)
+    - Đăng nhập thành công, server tạo phiên và trả cookie `bluemoon.sid`
+      (`HttpOnly`, `SameSite=Lax`, `Secure` khi chạy HTTPS). Frontend không lưu token, chỉ gọi API
+      với `credentials: 'include'`.
+    - Phiên lưu ở server (bảng session trong PostgreSQL, ví dụ do `connect-pg-simple` tạo), hết hạn
+      sau 30 phút không thao tác; mỗi request hợp lệ gia hạn lại 30 phút (rolling).
+    - Vô hiệu hóa, đổi vai trò hoặc đặt lại mật khẩu sẽ xóa ngay mọi phiên của tài khoản đó,
+      nên tác dụng là tức thời, không phải chờ token hết hạn.
+    - CORS chỉ cho phép đúng origin của frontend kèm `credentials`; API chỉ nhận body JSON.
+
+    ## Quy ước dữ liệu
+    - Enum được lưu trong CSDL (vai trò, các trạng thái, loại biến động, loại khoản thu...) dùng
+      đúng bộ mã của CSDL, ví dụ `KE_TOAN`, `DANG_O`, `CHUA_NOP`, `SINH_MOI`; riêng giới tính là
+      `Nam`/`Nữ`/`Khác`. Backend nhận và lưu nguyên giá trị, không có lớp chuyển đổi mã; CHECK
+      trong CSDL (migration trong `backend/prisma/migrations/`) là nơi quy định bộ mã hợp lệ.
+    - Enum chỉ tồn tại ở API, không lưu vào CSDL (`CampaignStatus` suy ra từ ngày, `reportType`,
+      `periodType`, `format`, `billingCycle`...) giữ mã tiếng Anh.
+    - Tên bảng và tên cột trong CSDL giữ tiếng Việt.
+    - Mọi id là số nguyên (schema `Id`), khớp với cột `id` SERIAL/BIGSERIAL trong CSDL.
+    - Khóa tạm do đăng nhập sai không phải là một trạng thái tài khoản: nó được suy ra từ
+      `lockedUntil` (cột `khoa_den_thoi_gian`).
+
     ## Mã lỗi nghiệp vụ
     | HTTP | code | Khi nào |
     |------|------|---------|
     | 400 | VALIDATION_ERROR | Dữ liệu đầu vào sai định dạng hoặc vi phạm ràng buộc |
     | 400 | INVALID_CURRENT_PASSWORD | Mật khẩu hiện tại không đúng khi đổi mật khẩu |
     | 400 | AMOUNT_EXCEEDS_REMAINING | Số tiền thu lớn hơn số còn phải nộp của khoản |
-    | 401 | UNAUTHORIZED | Chưa đăng nhập, token hết hạn hoặc tài khoản bị vô hiệu hóa |
+    | 401 | UNAUTHORIZED | Chưa đăng nhập, phiên hết hạn hoặc phiên đã bị hủy (tài khoản bị vô hiệu hóa, đổi vai trò, đặt lại mật khẩu) |
     | 401 | INVALID_CREDENTIALS | Sai tên đăng nhập/mật khẩu (thông báo chung) |
     | 403 | FORBIDDEN | Không đủ quyền |
     | 403 | PASSWORD_CHANGE_REQUIRED | Tài khoản phải đổi mật khẩu tạm trước khi dùng chức năng khác |
@@ -38,7 +60,7 @@ info:
 
 tags:
 - name: Authentication
-  description: Đăng nhập, đăng xuất, làm mới phiên, thông tin cá nhân và đổi mật khẩu.
+  description: Đăng nhập, đăng xuất, thông tin cá nhân và đổi mật khẩu.
 - name: Users
   description: Tạo tài khoản, quản lý vai trò, trạng thái và đặt lại mật khẩu.
 - name: Audit Logs
@@ -71,7 +93,7 @@ tags:
   description: Xuất báo cáo thu phí.
 
 security:
-- bearerAuth: []
+- cookieAuth: []
 
 paths:
   /api/auth/login:
@@ -84,8 +106,10 @@ paths:
         US02. Xác thực bằng tên đăng nhập và mật khẩu được cấp. Trả thông báo lỗi chung
         (INVALID_CREDENTIALS) khi thông tin không hợp lệ hoặc tài khoản đã bị vô hiệu hóa,
         không tiết lộ sai tên đăng nhập hay mật khẩu.
-        Theo tiêu chí chấp nhận: khóa tài khoản 15 phút sau 5 lần đăng nhập sai liên tiếp (423);
-        phiên hết hạn sau 30 phút không thao tác (accessToken ngắn hạn, refreshToken hạn trượt 30 phút).
+        Theo tiêu chí chấp nhận: khóa tài khoản 15 phút sau 5 lần đăng nhập sai liên tiếp (423,
+        ghi `khoa_den_thoi_gian`); phiên hết hạn sau 30 phút không thao tác.
+        Thành công: đặt lại bộ đếm sai mật khẩu, tạo phiên mới (regenerate session id để chống
+        session fixation) và trả cookie phiên qua header `Set-Cookie`.
       security: []
       x-user-stories:
       - US02
@@ -99,6 +123,11 @@ paths:
       responses:
         '200':
           description: Đăng nhập thành công.
+          headers:
+            Set-Cookie:
+              description: Cookie phiên, ví dụ `bluemoon.sid=s%3A...; Path=/; HttpOnly; SameSite=Lax`.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -122,37 +151,6 @@ paths:
                 message: Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau.
                 details:
                   lockedUntil: '2026-11-12T09:45:00+07:00'
-  /api/auth/refresh:
-    post:
-      tags:
-      - Authentication
-      operationId: refreshToken
-      summary: Làm mới phiên đăng nhập
-      description: |
-        US02. Đổi refreshToken còn hiệu lực lấy accessToken mới. Mỗi lần làm mới sẽ cấp refreshToken
-        mới (xoay vòng) và gia hạn cửa sổ 30 phút không thao tác; refreshToken cũ bị vô hiệu hóa.
-        Từ chối (401) nếu refreshToken hết hạn, đã bị thu hồi hoặc tài khoản không còn ACTIVE.
-      security: []
-      x-user-stories:
-      - US02
-      x-priority: MUST HAVE
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
-      responses:
-        '200':
-          description: Đã cấp token mới.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          $ref: '#/components/responses/ValidationError'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
   /api/auth/logout:
     post:
       tags:
@@ -160,22 +158,18 @@ paths:
       operationId: logout
       summary: Đăng xuất
       description: |
-        US02. Thu hồi refreshToken được gửi lên; nếu không gửi body thì thu hồi refreshToken gắn
-        với phiên hiện tại. accessToken hiện tại hết hiệu lực khi hết hạn ngắn của nó.
+        US02. Xóa phiên hiện tại ở server và xóa cookie phiên. Không có request body.
       x-user-stories:
       - US02
       x-priority: MUST HAVE
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
       responses:
         '204':
           description: Đăng xuất thành công.
-        '400':
-          $ref: '#/components/responses/ValidationError'
+          headers:
+            Set-Cookie:
+              description: Xóa cookie phiên, ví dụ `bluemoon.sid=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`.
+              schema:
+                type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/users:
@@ -288,9 +282,9 @@ paths:
       operationId: updateUserRole
       summary: Gán hoặc thay đổi vai trò tài khoản
       description: |
-        US05. Vai trò mới được áp dụng khi người dùng đăng nhập lại; API phải kiểm tra quyền
-        ở backend. Admin không được tự đổi vai trò của chính mình và không được hạ quyền
-        Admin cuối cùng (409).
+        US05. Mọi phiên của tài khoản bị xóa ngay, người dùng phải đăng nhập lại và vai trò mới
+        được áp dụng từ phiên mới; API phải kiểm tra quyền ở backend. Admin không được tự đổi vai
+        trò của chính mình và không được hạ quyền Admin cuối cùng (409).
       x-user-stories:
       - US05
       x-roles:
@@ -338,10 +332,12 @@ paths:
       operationId: updateUserStatus
       summary: Vô hiệu hóa hoặc kích hoạt tài khoản
       description: |
-        US05. Chỉ nhận ACTIVE hoặc INACTIVE; trạng thái LOCKED do hệ thống tự đặt khi đăng nhập sai
-        quá số lần cho phép. Đặt ACTIVE cho tài khoản đang LOCKED sẽ mở khóa ngay.
-        Tài khoản bị vô hiệu hóa không thể đăng nhập, mọi refresh token bị thu hồi; lịch sử thao tác
-        vẫn được giữ. Admin không được tự vô hiệu hóa mình và không được vô hiệu hóa Admin cuối cùng (409).
+        US05. Nhận ACTIVE hoặc INACTIVE. Khóa tạm do đăng nhập sai không phải trạng thái riêng
+        mà thể hiện qua `lockedUntil`; gửi ACTIVE cho tài khoản đang bị khóa tạm sẽ mở khóa ngay
+        (xóa `khoa_den_thoi_gian`, đặt bộ đếm sai mật khẩu về 0).
+        Tài khoản bị vô hiệu hóa không thể đăng nhập và mọi phiên của nó bị xóa ngay, request kế tiếp
+        nhận 401; lịch sử thao tác vẫn được giữ. Admin không được tự vô hiệu hóa mình và không được
+        vô hiệu hóa Admin cuối cùng (409).
       x-user-stories:
       - US05
       x-roles:
@@ -393,7 +389,7 @@ paths:
       summary: Đặt lại mật khẩu cho tài khoản
       description: |
         US05. Admin tạo mật khẩu tạm cho tài khoản khác (trả về đúng một lần, không lưu dạng rõ).
-        Mọi refresh token của tài khoản bị thu hồi và tài khoản phải đổi mật khẩu ở lần đăng nhập kế
+        Mọi phiên của tài khoản bị xóa ngay và tài khoản phải đổi mật khẩu ở lần đăng nhập kế
         tiếp (`mustChangePassword = true`). Admin tự đổi mật khẩu của mình qua `/api/me/password`.
       x-user-stories:
       - US05
@@ -425,8 +421,9 @@ paths:
       - Authentication
       operationId: getMyProfile
       summary: Xem thông tin cá nhân
-      description: US04. Trả về họ tên, số điện thoại, email, vai trò và tên đăng nhập của tài khoản hiện
-        tại.
+      description: |
+        US04. Trả về họ tên, số điện thoại, email, vai trò và tên đăng nhập của tài khoản hiện tại.
+        Frontend gọi API này khi tải lại trang để biết phiên còn hiệu lực (200) hay đã hết (401).
       x-user-stories:
       - US04
       x-priority: SHOULD HAVE
@@ -477,7 +474,8 @@ paths:
       description: |
         US03. Yêu cầu mật khẩu hiện tại chính xác; mật khẩu mới phải hợp lệ và khớp với trường
         xác nhận. Sai mật khẩu hiện tại trả 400 với code INVALID_CURRENT_PASSWORD (không dùng 401
-        để frontend không nhầm với hết phiên). Đổi thành công sẽ thu hồi các refresh token khác của tài khoản.
+        để frontend không nhầm với hết phiên). Đổi thành công sẽ xóa các phiên khác của tài khoản,
+        giữ phiên hiện tại (cấp lại session id) và đặt `mustChangePassword = false`.
       x-user-stories:
       - US03
       x-priority: MUST HAVE
@@ -520,7 +518,7 @@ paths:
       x-user-stories:
       - US06
       x-roles:
-      - BOARD_CHAIR
+      - TRUONG_BQT
       x-priority: COULD HAVE
       parameters:
       - $ref: '#/components/parameters/Page'
@@ -528,7 +526,7 @@ paths:
       - name: userId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: action
         in: query
         schema:
@@ -569,16 +567,16 @@ paths:
       operationId: listHouseholds
       summary: Danh sách hộ gia đình
       description: US07, US08, US23. Hỗ trợ phân trang và lọc/tìm theo mã căn hộ, thông tin hộ và trạng
-        thái. Mặc định chỉ trả hộ đang ACTIVE.
+        thái. Mặc định chỉ trả hộ đang DANG_O.
       x-user-stories:
       - US07
       - US08
       - US23
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - KE_TOAN
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
@@ -596,10 +594,10 @@ paths:
         schema:
           type: string
           enum:
-          - ACTIVE
-          - INACTIVE
+          - DANG_O
+          - DA_CHUYEN_DI
           - ALL
-          default: ACTIVE
+          default: DANG_O
       responses:
         '200':
           description: Danh sách hộ.
@@ -622,7 +620,7 @@ paths:
       x-user-stories:
       - US07
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -660,15 +658,15 @@ paths:
       summary: Xem chi tiết hộ gia đình
       description: |
         US08. Trả về thông tin hộ kèm danh sách nhân khẩu trong hộ.
-        Với vai trò ACCOUNTANT, mảng `members` bị lược bỏ để không lộ thông tin cá nhân (CCCD, ngày sinh);
+        Với vai trò KE_TOAN, mảng `members` bị lược bỏ để không lộ thông tin cá nhân (CCCD, ngày sinh);
         kế toán chỉ cần thông tin hộ và chủ hộ để thu phí.
       x-user-stories:
       - US08
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - KE_TOAN
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết hộ gia đình.
@@ -688,11 +686,11 @@ paths:
       description: |
         US08. Cập nhật một phần (chỉ các trường được gửi). Khi thay đổi diện tích, giá trị mới chỉ
         được dùng cho các kỳ phải nộp được lập sau thời điểm cập nhật; dữ liệu các kỳ đã lập phải
-        được giữ nguyên. Không đổi chủ hộ ở đây: dùng sự kiện HOUSEHOLD_HEAD_CHANGED của nhân khẩu.
+        được giữ nguyên. Không đổi chủ hộ ở đây: dùng sự kiện DOI_CHU_HO của nhân khẩu.
       x-user-stories:
       - US08
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       requestBody:
         required: true
@@ -723,11 +721,11 @@ paths:
       description: |
         US08. Chỉ cho phép xóa/ngừng quản lý khi hộ không còn khoản phí chưa nộp.
         Không xóa nếu còn công nợ. Để bảo toàn lịch sử, triển khai dùng xóa mềm
-        (chuyển status sang INACTIVE) thay vì xóa vật lý dữ liệu liên quan.
+        (chuyển status sang DA_CHUYEN_DI) thay vì xóa vật lý dữ liệu liên quan.
       x-user-stories:
       - US08
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       responses:
         '204':
@@ -759,8 +757,8 @@ paths:
       - US09
       x-roles:
       - ADMIN
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Danh sách nhân khẩu.
@@ -784,14 +782,14 @@ paths:
       description: |
         US09, US10. CCCD không được trùng. Cho phép người dưới 14 tuổi chưa có CCCD; từ 14 tuổi trở
         lên bắt buộc có CCCD (kiểm tra ở backend). Nhân khẩu thêm qua API này luôn không phải chủ hộ
-        (chủ hộ được tạo cùng hộ); đổi chủ hộ qua sự kiện HOUSEHOLD_HEAD_CHANGED.
-        Có thể kèm `registrationEvent` (NEW_BORN hoặc MOVED_IN) để tự ghi biến động tương ứng
+        (chủ hộ được tạo cùng hộ); đổi chủ hộ qua sự kiện DOI_CHU_HO.
+        Có thể kèm `registrationEvent` (SINH_MOI hoặc CHUYEN_DEN) để tự ghi biến động tương ứng
         trong cùng transaction.
       x-user-stories:
       - US09
       - US10
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -835,8 +833,8 @@ paths:
       - US10
       x-roles:
       - ADMIN
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết nhân khẩu.
@@ -858,11 +856,11 @@ paths:
       description: |
         US09. Cập nhật các thông tin cá nhân và quan hệ với chủ hộ; không dùng thao tác xóa cứng để
         ghi nhận biến động cư trú. Không đổi cờ chủ hộ ở đây (tránh vi phạm quy tắc đúng một chủ hộ):
-        dùng sự kiện HOUSEHOLD_HEAD_CHANGED.
+        dùng sự kiện DOI_CHU_HO.
       x-user-stories:
       - US09
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       requestBody:
         required: true
@@ -905,8 +903,8 @@ paths:
       - US10
       x-roles:
       - ADMIN
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Lịch sử biến động của nhân khẩu.
@@ -928,18 +926,18 @@ paths:
       operationId: createMemberEvent
       summary: Ghi nhận biến động nhân khẩu
       description: |
-        US10. Áp dụng cho nhân khẩu đã có hồ sơ: MOVED_OUT (chuyển đi), DECEASED (qua đời),
-        HOUSEHOLD_HEAD_CHANGED (đổi chủ hộ; `memberId` trong path là chủ hộ hiện tại).
-        Biến động NEW_BORN và MOVED_IN của người chưa có hồ sơ được ghi qua `registrationEvent`
+        US10. Áp dụng cho nhân khẩu đã có hồ sơ: CHUYEN_DI (chuyển đi), QUA_DOI (qua đời),
+        DOI_CHU_HO (đổi chủ hộ; `memberId` trong path là chủ hộ hiện tại).
+        Biến động SINH_MOI và CHUYEN_DEN của người chưa có hồ sơ được ghi qua `registrationEvent`
         khi thêm nhân khẩu (POST /api/households/{householdId}/members).
         Bản ghi phải có ngày biến động, loại biến động, ghi chú và người ghi nhận.
-        Sự kiện cập nhật `status` của nhân khẩu (MOVED_OUT, DECEASED).
+        Sự kiện cập nhật `status` của nhân khẩu: CHUYEN_DI → DA_CHUYEN_DI, QUA_DOI → DA_QUA_DOI.
         Khi chủ hộ chuyển đi, qua đời hoặc đổi chủ hộ, bắt buộc `newHeadMemberId` là nhân khẩu đang
-        RESIDING cùng hộ; thiếu hoặc không hợp lệ trả 409 HEAD_REPLACEMENT_REQUIRED.
+        THUONG_TRU cùng hộ; thiếu hoặc không hợp lệ trả 409 HEAD_REPLACEMENT_REQUIRED.
       x-user-stories:
       - US10
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       x-priority: SHOULD HAVE
       requestBody:
@@ -982,8 +980,8 @@ paths:
       - US11
       x-roles:
       - ADMIN
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       parameters:
       - name: type
         in: query
@@ -992,11 +990,11 @@ paths:
       - name: householdId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: memberId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: currentOnly
         in: query
         schema:
@@ -1024,15 +1022,15 @@ paths:
       summary: Đăng ký tạm trú hoặc tạm vắng
       description: |
         US11. Ngày kết thúc không được nhỏ hơn ngày bắt đầu. Phải gửi đúng một trong hai: `memberId`
-        (nhân khẩu đã có hồ sơ) hoặc `newPerson` (người tạm trú chưa có hồ sơ). TEMPORARY_ABSENCE chỉ
+        (nhân khẩu đã có hồ sơ) hoặc `newPerson` (người tạm trú chưa có hồ sơ). TAM_VANG chỉ
         dùng với `memberId`. Với `newPerson`, hệ thống tạo nhân khẩu mới gắn vào hộ với trạng thái
-        TEMPORARILY_STAYING (không phải chủ hộ) và trả `memberId` trong bản ghi. Trạng thái nhân khẩu
-        (TEMPORARILY_ABSENT/TEMPORARILY_STAYING) theo hiệu lực của bản ghi theo ngày. Trường thông tin
+        TAM_TRU (không phải chủ hộ) và trả `memberId` trong bản ghi. Trạng thái nhân khẩu
+        (TAM_VANG/TAM_TRU) theo hiệu lực của bản ghi theo ngày. Trường thông tin
         bắt buộc của người tạm trú cần được đối chiếu với quy định cư trú trước khi chốt triển khai.
       x-user-stories:
       - US11
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       x-priority: SHOULD HAVE
       requestBody:
@@ -1076,7 +1074,7 @@ paths:
       x-user-stories:
       - US12
       x-roles:
-      - BOARD_CHAIR
+      - TRUONG_BQT
       - ADMIN
       x-priority: SHOULD HAVE
       parameters:
@@ -1140,7 +1138,7 @@ paths:
       x-user-stories:
       - US13
       x-roles:
-      - RESIDENT_MANAGER
+      - CAN_BO_CU_DAN
       - ADMIN
       x-priority: COULD HAVE
       requestBody:
@@ -1185,8 +1183,8 @@ paths:
       - US16
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: status
         in: query
@@ -1220,7 +1218,7 @@ paths:
       x-user-stories:
       - US14
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -1272,8 +1270,8 @@ paths:
       - US16
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết khoản thu.
@@ -1303,7 +1301,7 @@ paths:
       x-user-stories:
       - US16
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: SHOULD HAVE
       requestBody:
@@ -1347,8 +1345,8 @@ paths:
       - US16
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Lịch sử đơn giá.
@@ -1377,7 +1375,7 @@ paths:
       x-user-stories:
       - US16
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       requestBody:
         required: true
@@ -1424,8 +1422,8 @@ paths:
       - US19
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: status
         in: query
@@ -1456,7 +1454,7 @@ paths:
       x-user-stories:
       - US15
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -1492,8 +1490,8 @@ paths:
       - US19
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết đợt đóng góp.
@@ -1516,15 +1514,15 @@ paths:
       description: |
         US17, US18. Lọc theo kỳ, hộ và trạng thái khoản phải nộp. Dùng `month` cho một kỳ hoặc
         `fromMonth`/`toMonth` cho một khoảng kỳ (không dùng đồng thời); bỏ trống cả hai để xem mọi kỳ.
-        `outstandingOnly=true` chỉ trả khoản còn phải nộp (UNPAID và PARTIALLY_PAID), tiện cho
+        `outstandingOnly=true` chỉ trả khoản còn phải nộp (CHUA_NOP và NOP_THIEU), tiện cho
         màn hình thu phí để liệt kê nợ tồn nhiều kỳ của một hộ.
       x-user-stories:
       - US17
       - US18
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: month
         in: query
@@ -1542,7 +1540,7 @@ paths:
       - name: householdId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: status
         in: query
         schema:
@@ -1573,7 +1571,7 @@ paths:
       operationId: generateMonthlyDues
       summary: Lập danh sách phải nộp theo tháng
       description: |
-        US17. Tạo khoản phải nộp cho mỗi hộ ACTIVE (đã chuyển đến trước hoặc trong kỳ) và mỗi khoản
+        US17. Tạo khoản phải nộp cho mỗi hộ DANG_O (đã chuyển đến trước hoặc trong kỳ) và mỗi khoản
         thu bắt buộc đang hoạt động. Số tiền = làm tròn half-up (đơn giá/m² × diện tích hộ) về đồng
         nguyên; đơn giá là mốc hiệu lực của kỳ, diện tích là giá trị tại thời điểm lập (cả hai được lưu
         kèm khoản phải nộp). Ràng buộc duy nhất theo hộ + khoản thu + kỳ nên thao tác idempotent:
@@ -1584,7 +1582,7 @@ paths:
       x-user-stories:
       - US17
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -1642,8 +1640,8 @@ paths:
       - US18
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết khoản phải nộp.
@@ -1668,7 +1666,7 @@ paths:
       x-user-stories:
       - US17
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       requestBody:
         required: true
@@ -1728,13 +1726,13 @@ paths:
       - US24
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: householdId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: month
         in: query
         schema:
@@ -1775,12 +1773,12 @@ paths:
         mỗi `dueId` chỉ xuất hiện một lần và phải thuộc `householdId` (400); khoản đã thanh toán hết
         trả 409 DUE_ALREADY_PAID. `paidAt` mặc định là thời điểm hiện tại, không được ở tương lai; cho phép
         ghi bổ sung ngày thu trong quá khứ (được ghi nhật ký).
-        Có thể nộp thiếu, khi đó khoản phải nộp chuyển trạng thái PARTIALLY_PAID và còn lại số tiền
+        Có thể nộp thiếu, khi đó khoản phải nộp chuyển trạng thái NOP_THIEU và còn lại số tiền
         chưa thu. Tạo phiếu và cập nhật khoản phải nộp trong cùng transaction.
       x-user-stories:
       - US18
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -1818,15 +1816,15 @@ paths:
       - Receipts
       operationId: getReceipt
       summary: Xem chi tiết phiếu thu
-      description: US18, US20, US22. Phiếu đã hủy vẫn được giữ và trả về với trạng thái CANCELLED.
+      description: US18, US20, US22. Phiếu đã hủy vẫn được giữ và trả về với trạng thái DA_HUY.
       x-user-stories:
       - US18
       - US20
       - US22
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết phiếu thu.
@@ -1858,8 +1856,8 @@ paths:
       - US20
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: format
         in: query
@@ -1897,14 +1895,14 @@ paths:
       summary: Hủy phiếu thu sai
       description: |
         US22. Bắt buộc cung cấp lý do hủy. Không xóa phiếu khỏi cơ sở dữ liệu;
-        phiếu chuyển trạng thái CANCELLED và không được tính vào công nợ/thống kê.
+        phiếu chuyển trạng thái DA_HUY và không được tính vào công nợ/thống kê.
         Hệ thống hoàn lại số tiền đã nộp trên từng khoản phải nộp liên quan (giảm `amountPaid`,
-        tính lại `amountRemaining` và trạng thái UNPAID/PARTIALLY_PAID) trong cùng transaction.
+        tính lại `amountRemaining` và trạng thái CHUA_NOP/NOP_THIEU) trong cùng transaction.
         Thao tác hủy phải được ghi vào nhật ký.
       x-user-stories:
       - US22
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: COULD HAVE
       requestBody:
@@ -1954,17 +1952,17 @@ paths:
       - US19
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: campaignId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: householdId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: status
         in: query
         schema:
@@ -1995,7 +1993,7 @@ paths:
       x-user-stories:
       - US19
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: MUST HAVE
       requestBody:
@@ -2034,13 +2032,13 @@ paths:
       - Contributions
       operationId: getContribution
       summary: Xem chi tiết khoản đóng góp
-      description: US19. Khoản đã hủy vẫn được giữ và trả về với trạng thái CANCELLED.
+      description: US19. Khoản đã hủy vẫn được giữ và trả về với trạng thái DA_HUY.
       x-user-stories:
       - US19
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       responses:
         '200':
           description: Chi tiết khoản đóng góp.
@@ -2064,11 +2062,11 @@ paths:
       summary: Hủy khoản đóng góp nhập sai
       description: |
         US19. Bắt buộc cung cấp lý do hủy. Không xóa khỏi cơ sở dữ liệu; khoản chuyển trạng thái
-        CANCELLED và không được tính vào thống kê. Thao tác hủy phải được ghi vào nhật ký.
+        DA_HUY và không được tính vào thống kê. Thao tác hủy phải được ghi vào nhật ký.
       x-user-stories:
       - US19
       x-roles:
-      - ACCOUNTANT
+      - KE_TOAN
       - ADMIN
       x-priority: COULD HAVE
       requestBody:
@@ -2121,8 +2119,8 @@ paths:
       - US21
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       x-priority: SHOULD HAVE
       parameters:
       - name: month
@@ -2141,7 +2139,7 @@ paths:
       - name: householdId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
       responses:
@@ -2168,15 +2166,15 @@ paths:
         tìm không dấu. Mục tiêu hiệu năng trong User Story là trả kết quả
         trong tối đa 2 giây với quy mô ước tính khoảng 2.000 nhân khẩu.
         Mỗi phần tử có `resultType` (HOUSEHOLD hoặc MEMBER) để phân biệt.
-        Với vai trò ACCOUNTANT, kết quả nhân khẩu chỉ gồm thông tin định danh tối thiểu để tìm hộ
+        Với vai trò KE_TOAN, kết quả nhân khẩu chỉ gồm thông tin định danh tối thiểu để tìm hộ
         thu phí và CCCD được che (chỉ hiện 4 số cuối).
       x-user-stories:
       - US23
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - KE_TOAN
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       x-priority: MUST HAVE
       parameters:
       - name: q
@@ -2224,8 +2222,8 @@ paths:
       - US24
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       parameters:
       - name: year
         in: query
@@ -2236,7 +2234,7 @@ paths:
       - name: feeId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/PageSize'
       responses:
@@ -2270,8 +2268,8 @@ paths:
       - US25
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       x-priority: MUST HAVE
       parameters:
       - name: periodType
@@ -2298,11 +2296,11 @@ paths:
       - name: feeId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       - name: campaignId
         in: query
         schema:
-          type: string
+          $ref: '#/components/schemas/Id'
       responses:
         '200':
           description: Dữ liệu tổng hợp thống kê.
@@ -2329,8 +2327,8 @@ paths:
       - US26
       x-roles:
       - ADMIN
-      - ACCOUNTANT
-      - BOARD_CHAIR
+      - KE_TOAN
+      - TRUONG_BQT
       x-priority: SHOULD HAVE
       parameters:
       - name: format
@@ -2382,60 +2380,62 @@ paths:
           $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: JWT accessToken được cấp sau khi đăng nhập thành công.
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: bluemoon.sid
+      description: |
+        Cookie phiên (HttpOnly) do server đặt khi đăng nhập thành công. Phiên lưu phía server,
+        hết hạn sau 30 phút không thao tác và gia hạn sau mỗi request hợp lệ.
   parameters:
     UserId:
       name: userId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     HouseholdId:
       name: householdId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     MemberId:
       name: memberId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     FeeId:
       name: feeId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     CampaignId:
       name: campaignId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     DueId:
       name: dueId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     ReceiptId:
       name: receiptId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     ContributionId:
       name: contributionId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Id'
     Page:
       name: page
       in: query
@@ -2454,7 +2454,7 @@ components:
         default: 20
   responses:
     Unauthorized:
-      description: Chưa xác thực, token không hợp lệ/hết hạn hoặc tài khoản đã bị vô hiệu hóa (code UNAUTHORIZED).
+      description: Chưa đăng nhập, phiên không tồn tại/hết hạn hoặc đã bị xóa (code UNAUTHORIZED).
       content:
         application/json:
           schema:
@@ -2519,6 +2519,14 @@ components:
                 type: string
               message:
                 type: string
+    Id:
+      type: integer
+      format: int64
+      minimum: 1
+      description: |
+        Khóa chính của bản ghi, khớp với cột `id` (SERIAL/BIGSERIAL) trong CSDL. API nhận và trả
+        dạng số, backend không chuyển sang chuỗi.
+      example: 42
     Money:
       type: integer
       format: int64
@@ -2555,17 +2563,18 @@ components:
       type: string
       enum:
       - ADMIN
-      - ACCOUNTANT
-      - RESIDENT_MANAGER
-      - BOARD_CHAIR
+      - KE_TOAN
+      - CAN_BO_CU_DAN
+      - TRUONG_BQT
       description: Admin, Kế toán, Cán bộ quản lý cư dân, Trưởng BQT.
     UserStatus:
       type: string
       enum:
       - ACTIVE
       - INACTIVE
-      - LOCKED
-      description: LOCKED do hệ thống tự đặt khi đăng nhập sai quá số lần cho phép.
+      description: |
+        ACTIVE: đang hoạt động; INACTIVE: bị Admin vô hiệu hóa. Khóa tạm do đăng nhập sai không phải
+        một trạng thái, xem `User.lockedUntil`.
     User:
       type: object
       required:
@@ -2577,7 +2586,7 @@ components:
       - createdAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         fullName:
           type: string
         username:
@@ -2595,11 +2604,19 @@ components:
           $ref: '#/components/schemas/UserRole'
         status:
           $ref: '#/components/schemas/UserStatus'
+        lockedUntil:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+          description: Thời điểm hết khóa tạm do đăng nhập sai (cột `khoa_den_thoi_gian`); null hoặc ở quá khứ
+            nghĩa là không bị khóa.
         mustChangePassword:
           type: boolean
           default: false
-          description: true khi mật khẩu là mật khẩu tạm do Admin đặt; chỉ /api/me/password và /api/auth/logout
-            dùng được cho đến khi đổi mật khẩu.
+          description: true khi mật khẩu là mật khẩu tạm do Admin đặt; chỉ GET /api/me, /api/me/password và
+            /api/auth/logout dùng được cho đến khi đổi mật khẩu.
         createdAt:
           type: string
           format: date-time
@@ -2661,40 +2678,17 @@ components:
         password:
           type: string
           format: password
-    RefreshRequest:
-      type: object
-      additionalProperties: false
-      required:
-      - refreshToken
-      properties:
-        refreshToken:
-          type: string
     AuthResponse:
       type: object
+      description: Body trả về khi đăng nhập; định danh phiên nằm trong cookie, không nằm trong body.
       required:
-      - accessToken
-      - tokenType
-      - expiresIn
-      - refreshToken
-      - refreshExpiresIn
+      - idleTimeoutSeconds
       - user
       properties:
-        accessToken:
-          type: string
-        tokenType:
-          type: string
-          example: Bearer
-        expiresIn:
+        idleTimeoutSeconds:
           type: integer
-          description: Thời gian hiệu lực của accessToken tính bằng giây (ngắn hạn).
-          example: 300
-        refreshToken:
-          type: string
-          description: Dùng để lấy token mới; xoay vòng ở mỗi lần làm mới.
-        refreshExpiresIn:
-          type: integer
-          description: Cửa sổ không hoạt động tối đa của phiên tính bằng giây, trượt theo mỗi lần làm
-            mới; theo acceptance criteria là 30 phút.
+          description: Số giây không thao tác thì phiên hết hạn (theo acceptance criteria là 30 phút).
+            Frontend có thể dùng để cảnh báo sắp hết phiên.
           example: 1800
         user:
           $ref: '#/components/schemas/User'
@@ -2752,9 +2746,9 @@ components:
       - createdAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         userId:
-          type: string
+          $ref: '#/components/schemas/Id'
         username:
           type: string
         action:
@@ -2762,7 +2756,7 @@ components:
         entityType:
           type: string
         entityId:
-          type: string
+          $ref: '#/components/schemas/Id'
         oldValue:
           type:
           - object
@@ -2790,8 +2784,8 @@ components:
     HouseholdStatus:
       type: string
       enum:
-      - ACTIVE
-      - INACTIVE
+      - DANG_O
+      - DA_CHUYEN_DI
     Household:
       type: object
       required:
@@ -2802,7 +2796,7 @@ components:
       - moveInDate
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         apartmentCode:
           type: string
         areaM2:
@@ -2813,9 +2807,9 @@ components:
           readOnly: true
           description: Suy ra từ nhân khẩu là chủ hộ; không ghi trực tiếp.
         headMemberId:
-          type:
-          - string
-          - 'null'
+          oneOf:
+          - $ref: '#/components/schemas/Id'
+          - type: 'null'
           readOnly: true
         moveInDate:
           type: string
@@ -2843,9 +2837,9 @@ components:
         gender:
           type: string
           enum:
-          - MALE
-          - FEMALE
-          - OTHER
+          - Nam
+          - Nữ
+          - Khác
         identityNumber:
           $ref: '#/components/schemas/IdentityNumber'
     HouseholdCreateRequest:
@@ -2886,7 +2880,7 @@ components:
         properties:
           members:
             type: array
-            description: Bị lược bỏ với vai trò ACCOUNTANT.
+            description: Bị lược bỏ với vai trò KE_TOAN.
             items:
               $ref: '#/components/schemas/Member'
     HouseholdListResponse:
@@ -2903,11 +2897,11 @@ components:
     MemberStatus:
       type: string
       enum:
-      - RESIDING
-      - TEMPORARILY_ABSENT
-      - TEMPORARILY_STAYING
-      - MOVED_OUT
-      - DECEASED
+      - THUONG_TRU
+      - TAM_VANG
+      - TAM_TRU
+      - DA_CHUYEN_DI
+      - DA_QUA_DOI
     Member:
       type: object
       required:
@@ -2921,9 +2915,9 @@ components:
       - status
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         fullName:
           type: string
         dateOfBirth:
@@ -2932,9 +2926,9 @@ components:
         gender:
           type: string
           enum:
-          - MALE
-          - FEMALE
-          - OTHER
+          - Nam
+          - Nữ
+          - Khác
         identityNumber:
           type:
           - string
@@ -2945,7 +2939,7 @@ components:
         isHouseholdHead:
           type: boolean
           readOnly: true
-          description: Chỉ thay đổi qua sự kiện HOUSEHOLD_HEAD_CHANGED.
+          description: Chỉ thay đổi qua sự kiện DOI_CHU_HO.
         status:
           $ref: '#/components/schemas/MemberStatus'
     MemberRegistrationEvent:
@@ -2959,8 +2953,8 @@ components:
         eventType:
           type: string
           enum:
-          - NEW_BORN
-          - MOVED_IN
+          - SINH_MOI
+          - CHUYEN_DEN
         eventDate:
           type: string
           format: date
@@ -2984,9 +2978,9 @@ components:
         gender:
           type: string
           enum:
-          - MALE
-          - FEMALE
-          - OTHER
+          - Nam
+          - Nữ
+          - Khác
         identityNumber:
           $ref: '#/components/schemas/IdentityNumber'
         relationshipToHead:
@@ -3008,9 +3002,9 @@ components:
         gender:
           type: string
           enum:
-          - MALE
-          - FEMALE
-          - OTHER
+          - Nam
+          - Nữ
+          - Khác
         identityNumber:
           oneOf:
           - $ref: '#/components/schemas/IdentityNumber'
@@ -3021,11 +3015,11 @@ components:
     MemberEventType:
       type: string
       enum:
-      - NEW_BORN
-      - MOVED_IN
-      - MOVED_OUT
-      - DECEASED
-      - HOUSEHOLD_HEAD_CHANGED
+      - SINH_MOI
+      - CHUYEN_DEN
+      - CHUYEN_DI
+      - QUA_DOI
+      - DOI_CHU_HO
     MemberEvent:
       type: object
       required:
@@ -3038,9 +3032,9 @@ components:
       - createdAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         memberId:
-          type: string
+          $ref: '#/components/schemas/Id'
         eventType:
           $ref: '#/components/schemas/MemberEventType'
         eventDate:
@@ -3049,11 +3043,11 @@ components:
         note:
           type: string
         newHeadMemberId:
-          type:
-          - string
-          - 'null'
+          oneOf:
+          - $ref: '#/components/schemas/Id'
+          - type: 'null'
         recordedBy:
-          type: string
+          $ref: '#/components/schemas/Id'
           description: ID người dùng ghi nhận.
         recordedByName:
           type: string
@@ -3071,9 +3065,9 @@ components:
         eventType:
           type: string
           enum:
-          - MOVED_OUT
-          - DECEASED
-          - HOUSEHOLD_HEAD_CHANGED
+          - CHUYEN_DI
+          - QUA_DOI
+          - DOI_CHU_HO
         eventDate:
           type: string
           format: date
@@ -3081,14 +3075,14 @@ components:
           type: string
           minLength: 1
         newHeadMemberId:
-          type: string
-          description: Bắt buộc khi chủ hộ chuyển đi, qua đời hoặc đổi chủ hộ; phải là nhân khẩu RESIDING
+          $ref: '#/components/schemas/Id'
+          description: Bắt buộc khi chủ hộ chuyển đi, qua đời hoặc đổi chủ hộ; phải là nhân khẩu THUONG_TRU
             cùng hộ.
     ResidenceRecordType:
       type: string
       enum:
-      - TEMPORARY_STAY
-      - TEMPORARY_ABSENCE
+      - TAM_TRU
+      - TAM_VANG
     ResidenceRecord:
       type: object
       required:
@@ -3103,13 +3097,13 @@ components:
       - createdAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         type:
           $ref: '#/components/schemas/ResidenceRecordType'
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         memberId:
-          type: string
+          $ref: '#/components/schemas/Id'
         personName:
           type: string
           description: Họ tên người tạm trú/tạm vắng (luôn có).
@@ -3144,9 +3138,9 @@ components:
         gender:
           type: string
           enum:
-          - MALE
-          - FEMALE
-          - OTHER
+          - Nam
+          - Nữ
+          - Khác
         identityNumber:
           $ref: '#/components/schemas/IdentityNumber'
     ResidenceRecordCreateRequest:
@@ -3162,9 +3156,9 @@ components:
         type:
           $ref: '#/components/schemas/ResidenceRecordType'
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         memberId:
-          type: string
+          $ref: '#/components/schemas/Id'
           description: Nhân khẩu đã có hồ sơ; loại trừ với newPerson.
         newPerson:
           $ref: '#/components/schemas/NewResidentPerson'
@@ -3203,8 +3197,6 @@ components:
       - errorRows
       - errors
       properties:
-        importId:
-          type: string
         totalRows:
           type: integer
         successRows:
@@ -3228,8 +3220,8 @@ components:
     FeeStatus:
       type: string
       enum:
-      - ACTIVE
-      - INACTIVE
+      - HOAT_DONG
+      - NGUNG_AP_DUNG
     FeeCategory:
       type: string
       enum:
@@ -3250,13 +3242,13 @@ components:
       - status
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         name:
           type: string
         type:
           type: string
           enum:
-          - MANDATORY
+          - BAT_BUOC
         category:
           $ref: '#/components/schemas/FeeCategory'
         unitPrice:
@@ -3264,7 +3256,7 @@ components:
         unit:
           type: string
           enum:
-          - VND_PER_M2
+          - VND/m2/thang
         billingCycle:
           type: string
           enum:
@@ -3285,16 +3277,16 @@ components:
       - createdAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         feeId:
-          type: string
+          $ref: '#/components/schemas/Id'
         unitPrice:
           $ref: '#/components/schemas/Money'
         effectiveFrom:
           type: string
           format: date
         createdBy:
-          type: string
+          $ref: '#/components/schemas/Id'
           description: ID người dùng tạo mốc giá.
         createdAt:
           type: string
@@ -3317,7 +3309,7 @@ components:
         type:
           type: string
           enum:
-          - MANDATORY
+          - BAT_BUOC
         category:
           $ref: '#/components/schemas/FeeCategory'
         unitPrice:
@@ -3325,7 +3317,7 @@ components:
         unit:
           type: string
           enum:
-          - VND_PER_M2
+          - VND/m2/thang
         billingCycle:
           type: string
           enum:
@@ -3386,7 +3378,7 @@ components:
       - status
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         name:
           type: string
         description:
@@ -3433,9 +3425,9 @@ components:
     DueStatus:
       type: string
       enum:
-      - UNPAID
-      - PARTIALLY_PAID
-      - PAID
+      - CHUA_NOP
+      - NOP_THIEU
+      - DA_NOP
     Due:
       type: object
       required:
@@ -3449,13 +3441,13 @@ components:
       - status
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         apartmentCode:
           type: string
         feeId:
-          type: string
+          $ref: '#/components/schemas/Id'
         feeName:
           type: string
         month:
@@ -3513,7 +3505,7 @@ components:
       type: object
       properties:
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         apartmentCode:
           type: string
         month:
@@ -3537,8 +3529,8 @@ components:
     ReceiptStatus:
       type: string
       enum:
-      - VALID
-      - CANCELLED
+      - HOP_LE
+      - DA_HUY
     ReceiptItemInput:
       type: object
       additionalProperties: false
@@ -3547,7 +3539,7 @@ components:
       - amount
       properties:
         dueId:
-          type: string
+          $ref: '#/components/schemas/Id'
         amount:
           type: integer
           format: int64
@@ -3561,7 +3553,7 @@ components:
       - items
       properties:
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         payerName:
           type: string
           description: Người nộp tiền; có thể là chủ hộ hoặc người được ủy quyền.
@@ -3580,7 +3572,7 @@ components:
       type: object
       properties:
         dueId:
-          type: string
+          $ref: '#/components/schemas/Id'
         feeName:
           type: string
         month:
@@ -3600,11 +3592,11 @@ components:
       - items
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         receiptNumber:
           type: string
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         apartmentCode:
           type: string
         payerName:
@@ -3613,7 +3605,7 @@ components:
           type: string
           format: date-time
         collectedBy:
-          type: string
+          $ref: '#/components/schemas/Id'
           description: ID người dùng đã thu.
         collectedByName:
           type: string
@@ -3657,8 +3649,8 @@ components:
     ContributionStatus:
       type: string
       enum:
-      - VALID
-      - CANCELLED
+      - HOP_LE
+      - DA_HUY
     ContributionCreateRequest:
       type: object
       additionalProperties: false
@@ -3668,9 +3660,9 @@ components:
       - amount
       properties:
         campaignId:
-          type: string
+          $ref: '#/components/schemas/Id'
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         amount:
           type: integer
           format: int64
@@ -3697,18 +3689,18 @@ components:
       - status
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/Id'
         campaignId:
-          type: string
+          $ref: '#/components/schemas/Id'
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         amount:
           $ref: '#/components/schemas/Money'
         receivedAt:
           type: string
           format: date-time
         receivedBy:
-          type: string
+          $ref: '#/components/schemas/Id'
           description: ID người dùng ghi nhận.
         receivedByName:
           type: string
@@ -3740,7 +3732,7 @@ components:
       type: object
       properties:
         feeId:
-          type: string
+          $ref: '#/components/schemas/Id'
         feeName:
           type: string
         month:
@@ -3755,7 +3747,7 @@ components:
       type: object
       properties:
         householdId:
-          type: string
+          $ref: '#/components/schemas/Id'
         apartmentCode:
           type: string
         headOfHouseholdName:
@@ -3876,7 +3868,7 @@ components:
             type: object
             properties:
               feeId:
-                type: string
+                $ref: '#/components/schemas/Id'
               feeName:
                 type: string
               amountDue:
@@ -3895,7 +3887,7 @@ components:
             type: object
             properties:
               campaignId:
-                type: string
+                $ref: '#/components/schemas/Id'
               campaignName:
                 type: string
               totalAmount:
