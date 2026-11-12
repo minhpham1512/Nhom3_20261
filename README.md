@@ -37,9 +37,12 @@ Nhom3_20261/
 │  │  ├─ schema.prisma    # mô hình dữ liệu cho Prisma Client
 │  │  ├─ migrations/      # lịch sử thay đổi CSDL, không sửa file đã merge
 │  │  └─ seed.sql         # dữ liệu mẫu
+│  ├─ generated/          # Prisma Client tự sinh khi npm install — không commit, không sửa tay
 │  ├─ prisma.config.ts    # cấu hình Prisma (đọc DATABASE_URL từ .env)
 │  ├─ .env.example        # mẫu biến môi trường, chép thành .env
-│  └─ package.json
+│  ├─ .env                # tạo từ .env.example trên máy mỗi người — không commit
+│  ├─ package.json
+│  └─ package-lock.json   # khóa phiên bản thư viện — phải commit khi thay đổi
 ├─ frontend/              # (Sprint 2) React + Vite
 ├─ shared/                # (Sprint 2) schema Zod dùng chung FE–BE
 ├─ doc/swagger.yaml       # đặc tả API, OpenAPI 3.1
