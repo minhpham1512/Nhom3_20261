@@ -2,8 +2,26 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Lock, User, AlertCircle, ArrowRight } from 'lucide-react'
-import type { AxiosError } from 'axios'
-import type { ApiErrorBody } from '@shared'
+import { isAxiosError } from 'axios'
+import { getApiErrorBody, getDetailString } from '../api/errors'
+
+/** "HH:mm ngày dd/MM/yyyy" theo giờ Việt Nam; null nếu chuỗi không phải thời điểm hợp lệ. */
+function formatVietnamTime(iso: string): string | null {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('hour')}:${get('minute')} ngày ${get('day')}/${get('month')}/${get('year')}`
+}
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth()
@@ -32,16 +50,22 @@ export const LoginPage: React.FC = () => {
         navigate('/dashboard', { replace: true })
       }
     } catch (err) {
-      const axiosErr = err as AxiosError<ApiErrorBody>
-      const status = axiosErr.response?.status
-      const code = axiosErr.response?.data?.code
+      const status = isAxiosError(err) ? err.response?.status : undefined
+      const body = getApiErrorBody(err)
+      const code = body?.code
 
       if (status === 423 || code === 'ACCOUNT_LOCKED') {
-        setErrorMsg('Tài khoản đang bị tạm khóa 15 phút do nhập sai mật khẩu quá 5 lần.')
+        const lockedUntil = getDetailString(body, 'lockedUntil')
+        const until = lockedUntil ? formatVietnamTime(lockedUntil) : null
+        setErrorMsg(
+          until
+            ? `Tài khoản đang bị tạm khóa đến ${until}.`
+            : 'Tài khoản đang bị tạm khóa do nhập sai mật khẩu nhiều lần. Vui lòng thử lại sau.',
+        )
       } else if (status === 401 || code === 'INVALID_CREDENTIALS') {
         setErrorMsg('Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản đã bị vô hiệu hóa.')
       } else {
-        setErrorMsg(axiosErr.response?.data?.message || 'Không thể đăng nhập. Vui lòng thử lại.')
+        setErrorMsg(body?.message || 'Không thể đăng nhập. Vui lòng thử lại.')
       }
     } finally {
       setIsSubmitting(false)

@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios'
-import type { ApiErrorBody } from '@shared'
+import axios from 'axios'
+import type { ApiAxiosError } from './errors'
 
 export const api = axios.create({
   baseURL: '/api',
@@ -12,13 +12,15 @@ export const api = axios.create({
 // Interceptor xử lý lỗi phản hồi tập trung
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiErrorBody>) => {
+  (error: ApiAxiosError) => {
     const status = error.response?.status
     const data = error.response?.data
 
     // 401 Unauthorized: Hết phiên hoặc chưa đăng nhập
     if (status === 401) {
-      const isAuthCheck = error.config?.url?.includes('/me')
+      // Chỉ GET /me (kiểm tra phiên khi tải trang) được phép trả 401 mà không chuyển trang.
+      // So khớp chính xác để không bỏ sót /members/..., /me/password...
+      const isAuthCheck = error.config?.url === '/me'
       const isLoginPage = window.location.pathname === '/login'
       if (!isAuthCheck && !isLoginPage) {
         window.location.href = '/login'
