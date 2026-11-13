@@ -1,72 +1,10 @@
 import React from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import {
-  Building2,
-  LayoutDashboard,
-  Users,
-  Receipt,
-  HeartHandshake,
-  CreditCard,
-  AlertCircle,
-  BarChart3,
-  ShieldCheck,
-  LogOut,
-  User as UserIcon,
-} from 'lucide-react'
+import { useAuth } from '../features/auth/AuthContext'
+import { Building2, LogOut, User as UserIcon } from 'lucide-react'
 import type { UserRole } from '@shared'
-
-interface NavItem {
-  title: string
-  to: string
-  icon: React.ComponentType<{ className?: string }>
-  roles?: UserRole[]
-}
-
-const navItems: NavItem[] = [
-  { title: 'Tổng quan', to: '/dashboard', icon: LayoutDashboard },
-  {
-    title: 'Hộ & Cư dân',
-    to: '/households',
-    icon: Users,
-    roles: ['ADMIN', 'CAN_BO_CU_DAN', 'TRUONG_BQT'],
-  },
-  {
-    title: 'Khoản thu',
-    to: '/fees',
-    icon: Receipt,
-    roles: ['ADMIN', 'KE_TOAN'],
-  },
-  {
-    title: 'Đợt đóng góp',
-    to: '/campaigns',
-    icon: HeartHandshake,
-    roles: ['ADMIN', 'KE_TOAN'],
-  },
-  {
-    title: 'Thu phí & Phiếu thu',
-    to: '/billing',
-    icon: CreditCard,
-    roles: ['ADMIN', 'KE_TOAN'],
-  },
-  {
-    title: 'Công nợ',
-    to: '/debts',
-    icon: AlertCircle,
-    roles: ['ADMIN', 'KE_TOAN'],
-  },
-  {
-    title: 'Báo cáo & Thống kê',
-    to: '/reports',
-    icon: BarChart3,
-  },
-  {
-    title: 'Quản trị tài khoản',
-    to: '/users',
-    icon: ShieldCheck,
-    roles: ['ADMIN'],
-  },
-]
+import { appRoutes, canAccess } from '../app/routes'
+import { cn } from '../lib/cn'
 
 const roleLabels: Record<UserRole, string> = {
   ADMIN: 'Quản trị viên',
@@ -78,11 +16,7 @@ const roleLabels: Record<UserRole, string> = {
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth()
 
-  const visibleNavItems = navItems.filter((item) => {
-    if (!item.roles) return true
-    if (!user) return false
-    return item.roles.includes(user.role)
-  })
+  const visibleNavItems = appRoutes.filter((route) => canAccess(route, user?.role))
 
   return (
     <div className="flex h-screen bg-slate-100 text-slate-800">
@@ -105,14 +39,15 @@ export const MainLayout: React.FC = () => {
             const Icon = item.icon
             return (
               <NavLink
-                key={item.to}
-                to={item.to}
+                key={item.path}
+                to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+                  )
                 }
               >
                 <Icon className="h-5 w-5 shrink-0" />

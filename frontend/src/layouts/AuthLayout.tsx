@@ -1,6 +1,6 @@
 import React from 'react'
 import { Outlet, Navigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../features/auth/AuthContext'
 import { Building2 } from 'lucide-react'
 
 export const AuthLayout: React.FC = () => {

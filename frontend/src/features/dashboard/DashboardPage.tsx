@@ -1,5 +1,5 @@
 import React from 'react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../auth/AuthContext'
 import { Building2, Users, Receipt, CreditCard, Shield } from 'lucide-react'
 
 export const DashboardPage: React.FC = () => {

@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
-import { getApiErrorBody, hasFieldErrors } from '../api/errors'
-import { useAuth } from '../context/AuthContext'
+import { api } from '../../lib/client'
+import { getApiErrorBody, hasFieldErrors } from '../../lib/errors'
+import { useAuth } from './AuthContext'
 import { KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react'
 import type { ChangePasswordRequest } from '@shared'
 

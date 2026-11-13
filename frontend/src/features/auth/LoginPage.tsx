@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from './AuthContext'
 import { Lock, User, AlertCircle, ArrowRight } from 'lucide-react'
 import { isAxiosError } from 'axios'
-import { getApiErrorBody, getDetailString } from '../api/errors'
+import { getApiErrorBody, getDetailString } from '../../lib/errors'
 
 /** "HH:mm ngày dd/MM/yyyy" theo giờ Việt Nam; null nếu chuỗi không phải thời điểm hợp lệ. */
 function formatVietnamTime(iso: string): string | null {
