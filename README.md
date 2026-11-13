@@ -43,8 +43,8 @@ Nhom3_20261/
 │  ├─ .env                # tạo từ .env.example trên máy mỗi người — không commit
 │  ├─ package.json
 │  └─ package-lock.json   # khóa phiên bản thư viện — phải commit khi thay đổi
-├─ frontend/              # (Sprint 2) React + Vite
-├─ shared/                # (Sprint 2) schema Zod dùng chung FE–BE
+├─ frontend/              # React + Vite + TypeScript + Tailwind CSS
+├─ shared/                # type TypeScript sinh từ doc/swagger.yaml, dùng chung FE–BE
 ├─ doc/swagger.yaml       # đặc tả API, OpenAPI 3.1
 ├─ docker-compose.yml     # PostgreSQL 18 cho máy dev
 ├─ DATABASE.md

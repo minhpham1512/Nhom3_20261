@@ -1,0 +1,12 @@
+{
+  "name": "@bluemoon/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "gen:api": "openapi-typescript ../doc/swagger.yaml -o src/api/openapi.gen.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0"
+  }
+}
