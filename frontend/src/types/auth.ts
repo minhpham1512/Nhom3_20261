@@ -1,6 +1,6 @@
 export type UserRole = 'ADMIN' | 'KE_TOAN' | 'CAN_BO_CU_DAN' | 'TRUONG_BQT'
 
-export type UserStatus = 'HOAT_DONG' | 'VO_HIEU_HOA'
+export type UserStatus = 'ACTIVE' | 'INACTIVE'
 
 export interface User {
   id: number
