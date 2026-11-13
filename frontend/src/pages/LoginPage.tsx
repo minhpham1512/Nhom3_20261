@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Lock, User, AlertCircle, ArrowRight } from 'lucide-react'
 import type { AxiosError } from 'axios'
-import type { ApiErrorResponse } from '../types/auth'
+import type { ApiErrorBody } from '@shared'
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth()
@@ -32,7 +32,7 @@ export const LoginPage: React.FC = () => {
         navigate('/dashboard', { replace: true })
       }
     } catch (err) {
-      const axiosErr = err as AxiosError<ApiErrorResponse>
+      const axiosErr = err as AxiosError<ApiErrorBody>
       const status = axiosErr.response?.status
       const code = axiosErr.response?.data?.code
 

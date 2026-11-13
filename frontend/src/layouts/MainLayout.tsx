@@ -14,7 +14,7 @@ import {
   LogOut,
   User as UserIcon,
 } from 'lucide-react'
-import type { UserRole } from '../types/auth'
+import type { UserRole } from '@shared'
 
 interface NavItem {
   title: string

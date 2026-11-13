@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react'
 import type { AxiosError } from 'axios'
-import type { ApiErrorResponse } from '../types/auth'
+import type { ApiErrorBody } from '@shared'
 
 export const ForceChangePasswordPage: React.FC = () => {
   const { user, refreshUser } = useAuth()
@@ -40,7 +40,7 @@ export const ForceChangePasswordPage: React.FC = () => {
       await refreshUser()
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      const axiosErr = err as AxiosError<ApiErrorResponse>
+      const axiosErr = err as AxiosError<ApiErrorBody>
       const code = axiosErr.response?.data?.code
       if (code === 'INVALID_CURRENT_PASSWORD') {
         setErrorMsg('Mật khẩu hiện tại không chính xác.')

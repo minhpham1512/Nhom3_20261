@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api } from '../api/client'
-import type { User, LoginPayload, AuthResponse } from '../types/auth'
+import type { User, LoginRequest, AuthResponse } from '@shared'
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (payload: LoginPayload) => Promise<User>
+  login: (payload: LoginRequest) => Promise<User>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     refreshUser()
   }, [])
 
-  const login = async (payload: LoginPayload): Promise<User> => {
+  const login = async (payload: LoginRequest): Promise<User> => {
     const res = await api.post<AuthResponse>('/auth/login', payload)
     const loggedUser = res.data.user
     setUser(loggedUser)

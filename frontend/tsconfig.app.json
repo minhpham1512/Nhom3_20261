@@ -16,6 +16,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Path alias: type sinh từ swagger trong ../shared */
+    "paths": {
+      "@shared": ["../shared/src/index.ts"],
+      "@shared/*": ["../shared/src/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

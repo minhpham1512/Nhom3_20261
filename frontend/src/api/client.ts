@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import type { ApiErrorResponse } from '../types/auth'
+import type { ApiErrorBody } from '@shared'
 
 export const api = axios.create({
   baseURL: '/api',
@@ -12,7 +12,7 @@ export const api = axios.create({
 // Interceptor xử lý lỗi phản hồi tập trung
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiErrorResponse>) => {
+  (error: AxiosError<ApiErrorBody>) => {
     const status = error.response?.status
     const data = error.response?.data
 
