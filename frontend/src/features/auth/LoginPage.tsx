@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
-import { Lock, User, AlertCircle, ArrowRight } from 'lucide-react'
+import { Lock, User, AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, Sparkles } from 'lucide-react'
 import { isAxiosError } from 'axios'
 import { getApiErrorBody, getDetailString } from '../../lib/errors'
 
@@ -29,8 +29,15 @@ export const LoginPage: React.FC = () => {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleFillDemo = (demoUser: string, demoPass: string) => {
+    setUsername(demoUser)
+    setPassword(demoPass)
+    setErrorMsg(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,75 +80,125 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div>
-      <h3 className="text-xl font-bold text-white">Đăng nhập hệ thống</h3>
-      <p className="mt-1 text-sm text-slate-400">
-        Sử dụng tài khoản BQT được cấp để truy cập
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-white">Đăng nhập tài khoản BQT</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Nhập thông tin xác thực để truy cập hệ thống quản trị
+        </p>
+      </div>
 
       {errorMsg && (
-        <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-red-950/60 p-3 text-sm text-red-300 ring-1 ring-red-800">
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-950/50 p-3.5 text-sm text-red-200 backdrop-blur-sm animate-in fade-in duration-200">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <span>{errorMsg}</span>
+          <div className="flex-1 font-medium leading-relaxed">{errorMsg}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <label
+            htmlFor="username-input"
+            className="block text-xs font-semibold uppercase tracking-wider text-slate-300"
+          >
             Tên đăng nhập
           </label>
-          <div className="relative mt-1">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+          <div className="relative mt-1.5">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
               <User className="h-4 w-4" />
             </div>
             <input
+              id="username-input"
               type="text"
               autoComplete="username"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="ví dụ: admin"
-              className="w-full rounded-lg border border-slate-700 bg-slate-900/80 py-2.5 pr-3 pl-9 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pr-3 pl-10 text-sm text-white placeholder-slate-500 transition-all focus:border-blue-500 focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            Mật khẩu
-          </label>
-          <div className="relative mt-1">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="password-input"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-300"
+            >
+              Mật khẩu
+            </label>
+          </div>
+          <div className="relative mt-1.5">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
               <Lock className="h-4 w-4" />
             </div>
             <input
-              type="password"
+              id="password-input"
+              type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full rounded-lg border border-slate-700 bg-slate-900/80 py-2.5 pr-3 pl-9 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pr-10 pl-10 text-sm text-white placeholder-slate-500 transition-all focus:border-blue-500 focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-200 focus:outline-none"
+              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-60"
+          className="group relative mt-2 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition duration-200 hover:from-blue-500 hover:to-indigo-500 focus:ring-2 focus:ring-blue-500/50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <span>Đang xác thực...</span>
+            </div>
           ) : (
             <>
-              <span>Đăng nhập</span>
-              <ArrowRight className="h-4 w-4" />
+              <span>Đăng nhập hệ thống</span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </>
           )}
         </button>
       </form>
+
+      {/* Demo helper badge for convenience */}
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3.5">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span className="flex items-center gap-1.5 font-medium text-slate-300">
+            <KeyRound className="h-3.5 w-3.5 text-blue-400" />
+            Tài khoản mẫu:
+          </span>
+          <button
+            type="button"
+            onClick={() => handleFillDemo('admin', 'Admin@123')}
+            className="flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-semibold text-blue-400 transition hover:bg-blue-500/20"
+          >
+            <Sparkles className="h-3 w-3" />
+            Điền nhanh
+          </button>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between font-mono text-xs text-slate-400">
+          <span>
+            user: <strong className="text-white">admin</strong>
+          </span>
+          <span>
+            pass: <strong className="text-white">Admin@123</strong>
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

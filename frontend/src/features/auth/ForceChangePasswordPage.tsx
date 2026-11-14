@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/client'
 import { getApiErrorBody, hasFieldErrors } from '../../lib/errors'
 import { useAuth } from './AuthContext'
-import { KeyRound, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { KeyRound, AlertCircle, CheckCircle2, Eye, EyeOff, ShieldAlert, ArrowRight } from 'lucide-react'
 import type { ChangePasswordRequest } from '@shared'
 
 type PasswordField = keyof ChangePasswordRequest
@@ -33,9 +33,20 @@ export const ForceChangePasswordPage: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Real-time checks
+  const hasMinLength = newPassword.length >= 8
+  const hasLetter = /\p{L}/u.test(newPassword)
+  const hasNumber = /\d/.test(newPassword)
+  const isMatch = Boolean(confirmNewPassword && newPassword === confirmNewPassword)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,79 +97,144 @@ export const ForceChangePasswordPage: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="flex items-center gap-2 text-amber-400">
-        <KeyRound className="h-6 w-6" />
-        <h3 className="text-xl font-bold text-white">Bắt buộc đổi mật khẩu</h3>
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-center gap-2 text-amber-400">
+          <ShieldAlert className="h-6 w-6" />
+          <h2 className="text-xl font-bold text-white">Bắt buộc cập nhật mật khẩu</h2>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+          Xin chào <strong className="text-white">{user?.fullName}</strong>. Để đảm bảo an toàn cho dữ liệu chung cư BlueMoon, bạn vui lòng đổi mật khẩu mới cho lần đầu đăng nhập.
+        </p>
       </div>
-      <p className="mt-2 text-sm text-slate-300">
-        Xin chào <strong>{user?.fullName}</strong>. Đây là lần đăng nhập đầu tiên hoặc mật khẩu của bạn vừa được quản trị viên đặt lại. Vui lòng cập nhật mật khẩu mới để tiếp tục sử dụng hệ thống.
-      </p>
 
       {errorMsg && (
-        <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-red-950/60 p-3 text-sm text-red-300 ring-1 ring-red-800">
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-950/50 p-3.5 text-sm text-red-200">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
-          <span>{errorMsg}</span>
+          <span className="flex-1 font-medium">{errorMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Mật khẩu hiện tại */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            Mật khẩu hiện tại
+            Mật khẩu hiện tại (khởi tạo)
           </label>
-          <input
-            type="password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            aria-invalid={!!fieldErrors.currentPassword}
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-          />
+          <div className="relative mt-1.5">
+            <input
+              type={showCurrentPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Nhập mật khẩu hiện tại"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pr-10 pl-3.5 text-sm text-white placeholder-slate-500 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-200"
+              tabIndex={-1}
+            >
+              {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <FieldError message={fieldErrors.currentPassword} />
         </div>
 
+        {/* Mật khẩu mới */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            Mật khẩu mới (tối thiểu 8 ký tự, gồm chữ và số)
+            Mật khẩu mới
           </label>
-          <input
-            type="password"
-            required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            aria-invalid={!!fieldErrors.newPassword}
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-          />
+          <div className="relative mt-1.5">
+            <input
+              type={showNewPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Tối thiểu 8 ký tự, có chữ và số"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pr-10 pl-3.5 text-sm text-white placeholder-slate-500 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword(!showNewPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-200"
+              tabIndex={-1}
+            >
+              {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <FieldError message={fieldErrors.newPassword} />
         </div>
 
+        {/* Xác nhận mật khẩu mới */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
             Xác nhận mật khẩu mới
           </label>
-          <input
-            type="password"
-            required
-            value={confirmNewPassword}
-            onChange={(e) => setConfirmNewPassword(e.target.value)}
-            aria-invalid={!!fieldErrors.confirmNewPassword}
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-          />
+          <div className="relative mt-1.5">
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              required
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder="Nhập lại mật khẩu mới"
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/90 py-2.5 pr-10 pl-3.5 text-sm text-white placeholder-slate-500 transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-200"
+              tabIndex={-1}
+            >
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <FieldError message={fieldErrors.confirmNewPassword} />
+        </div>
+
+        {/* Password Strength Checklist Indicator */}
+        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5 text-xs">
+          <p className="font-semibold text-slate-300">Quy tắc bảo mật mật khẩu:</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className={`flex items-center gap-1.5 transition-colors ${hasMinLength ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Tối thiểu 8 ký tự</span>
+            </div>
+            <div className={`flex items-center gap-1.5 transition-colors ${hasLetter ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Chứa ít nhất 1 chữ cái</span>
+            </div>
+            <div className={`flex items-center gap-1.5 transition-colors ${hasNumber ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Chứa ít nhất 1 chữ số</span>
+            </div>
+            <div className={`flex items-center gap-1.5 transition-colors ${isMatch ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Mật khẩu xác nhận khớp</span>
+            </div>
+          </div>
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-blue-500 disabled:opacity-60"
+          className="group mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:from-blue-500 hover:to-indigo-500 focus:ring-2 focus:ring-blue-500/50 focus:outline-none disabled:opacity-60"
         >
           {isSubmitting ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <span>Đang lưu mật khẩu mới...</span>
+            </div>
           ) : (
             <>
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Cập nhật và tiếp tục</span>
+              <KeyRound className="h-4 w-4" />
+              <span>Lưu mật khẩu &amp; Tiếp tục</span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </>
           )}
         </button>
