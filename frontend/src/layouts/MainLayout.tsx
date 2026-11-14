@@ -6,7 +6,6 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   ChevronRight,
 } from 'lucide-react'
 import type { UserRole } from '@shared'
@@ -236,22 +235,6 @@ export const MainLayout: React.FC = () => {
 
           {/* Right actions */}
           <div className="flex items-center gap-3">
-            {/* Building status chip */}
-            <div className="hidden md:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Tháp A &amp; B • 350 Căn hộ</span>
-            </div>
-
-            {/* Notification button */}
-            <button
-              className="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none"
-              title="Thông báo hệ thống"
-              aria-label="Thông báo"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white" />
-            </button>
-
             {/* Logout button */}
             <button
               onClick={() => logout()}

@@ -39,145 +39,142 @@ export const appRoutes: AppRoute[] = [
     category: 'TỔNG QUAN',
     element: <DashboardPage />,
   },
-  // Phân hệ Cư dân (Phase 3)
+  // Phân hệ Quản lý Cư dân & Căn hộ
   {
     path: '/households',
     title: 'Hộ & Cư dân',
     icon: Users,
     category: 'QUẢN LÝ CƯ DÂN',
-    badge: 'Phase 3',
+    badge: 'Đang phát triển',
     roles: ['ADMIN', 'CAN_BO_CU_DAN', 'TRUONG_BQT'],
     element: (
       <ComingSoonPage
         title="Phân hệ Quản lý Cư dân & Căn hộ"
-        phase="Phase 3 • Sprint 2"
-        description="Quản lý danh sách 350 căn hộ, sổ hộ khẩu, nhân khẩu, biến động tạm trú / tạm vắng và tách nhập hộ khẩu."
+        description="Quản lý danh sách hộ gia đình, nhân khẩu, biến động cư trú và tìm kiếm thông tin cư dân."
         features={[
-          'Tra cứu & quản lý chi tiết căn hộ, diện tích m² và thông tin chủ hộ',
-          'Đăng ký biến động nhân khẩu: Thường trú, Tạm trú, Tạm vắng',
-          'Lịch sử cư trú và quan hệ gia đình (Chủ hộ, Vợ, Con...)',
+          'US07: Thêm hộ gia đình mới và thông tin căn hộ',
+          'US08: Chỉnh sửa thông tin hộ gia đình hoặc ghi nhận chuyển đi',
+          'US09: Thêm nhân khẩu vào hộ gia đình',
+          'US10: Chỉnh sửa hoặc xóa nhân khẩu khỏi hộ',
+          'US11: Đăng ký biến động nhân khẩu (tạm trú, tạm vắng)',
+          'US13: Nhập dữ liệu danh sách hộ và nhân khẩu từ tệp Excel',
+          'US23: Tra cứu, tìm kiếm hộ gia đình và cư dân',
         ]}
       />
     ),
   },
-  // Phân hệ Khoản thu & Đợt đóng góp (Phase 4)
+  // Phân hệ Khoản thu bắt buộc
   {
     path: '/fees',
-    title: 'Khoản thu & Đơn giá',
+    title: 'Khoản thu',
     icon: Receipt,
     category: 'TÀI CHÍNH & THU PHÍ',
-    badge: 'Phase 4',
+    badge: 'Đang phát triển',
     roles: ['ADMIN', 'KE_TOAN'],
     element: (
       <ComingSoonPage
         title="Phân hệ Quản lý Khoản thu & Đơn giá"
-        phase="Phase 4 • Sprint 2"
-        description="Cấu hình danh mục phí bắt buộc theo quy định chung cư (khung 2.500 - 16.500 đ/m²), phí quản lý, phí vệ sinh, phí phương tiện."
+        description="Cấu hình danh mục các khoản thu bắt buộc với đơn giá tính theo m² diện tích sàn."
         features={[
-          'Thiết lập đơn giá phí dịch vụ theo m² sàn thông thủy',
-          'Biểu phí trông giữ phương tiện (ô tô, xe máy, xe đạp điện)',
-          'Kiểm soát lịch sử thay đổi biểu giá và hiệu lực áp dụng',
+          'US14: Tạo khoản thu bắt buộc với đơn giá theo m² diện tích sàn',
+          'US16: Chỉnh sửa hoặc ngừng áp dụng khoản thu bắt buộc',
         ]}
       />
     ),
   },
+  // Phân hệ Đợt vận động đóng góp
   {
     path: '/campaigns',
     title: 'Đợt đóng góp',
     icon: HeartHandshake,
     category: 'TÀI CHÍNH & THU PHÍ',
-    badge: 'Phase 4',
+    badge: 'Đang phát triển',
     roles: ['ADMIN', 'KE_TOAN'],
     element: (
       <ComingSoonPage
         title="Phân hệ Đợt vận động đóng góp"
-        phase="Phase 4 • Sprint 2"
-        description="Tổ chức các đợt vận động tự nguyện: Quỹ khuyến học, Quỹ vì người nghèo, Ủng hộ đồng bào bão lũ, Quỹ lễ hội chung cư."
+        description="Tổ chức các đợt vận động đóng góp tự nguyện và ghi nhận ủng hộ của cư dân."
         features={[
-          'Phát động chiến dịch quyên góp với mục tiêu và thời hạn',
-          'Ghi nhận đóng góp theo từng căn hộ hoặc ẩn danh',
-          'Công khai minh bạch tiến độ đạt chỉ tiêu và bảng vàng đóng góp',
+          'US15: Tạo và quản lý đợt quyên góp, vận động đóng góp tự nguyện',
+          'US19: Ghi nhận đóng góp tự nguyện của cư dân theo đợt',
         ]}
       />
     ),
   },
-  // Phân hệ Thu phí & Công nợ (Phase 5)
+  // Phân hệ Thu phí & Phiếu thu
   {
     path: '/billing',
     title: 'Thu phí & Phiếu thu',
     icon: CreditCard,
     category: 'TÀI CHÍNH & THU PHÍ',
-    badge: 'Phase 5',
+    badge: 'Đang phát triển',
     roles: ['ADMIN', 'KE_TOAN'],
     element: (
       <ComingSoonPage
-        title="Phân hệ Thu phí & Lập Phiếu thu"
-        phase="Phase 5 • Sprint 2"
-        description="Tự động tính toán các khoản phải thu hàng tháng cho từng căn hộ, xuất bảng kê, in phiếu thu và xác nhận thanh toán."
+        title="Phân hệ Thu phí & Phiếu thu"
+        description="Lập danh sách các khoản phải nộp hàng tháng, ghi nhận thu phí, in và hủy phiếu thu."
         features={[
-          'Tự động sinh đợt thu theo chu kỳ tháng cho 350 căn hộ',
-          'Hỗ trợ thanh toán tiền mặt & chuyển khoản ngân hàng (VietQR)',
-          'Xuất phiếu thu PDF có mã vạch / QR xác thực giao dịch',
+          'US17: Lập danh sách các khoản phải nộp theo tháng cho từng hộ',
+          'US18: Ghi nhận thu phí và thanh toán tiền của hộ gia đình',
+          'US20: In phiếu thu (biên lai) bàn giao cho người nộp',
+          'US22: Hủy phiếu thu kèm lý do và lưu vết lịch sử',
         ]}
       />
     ),
   },
+  // Phân hệ Theo dõi Công nợ
   {
     path: '/debts',
-    title: 'Theo dõi Công nợ',
+    title: 'Công nợ',
     icon: AlertCircle,
     category: 'TÀI CHÍNH & THU PHÍ',
-    badge: 'Phase 5',
+    badge: 'Đang phát triển',
     roles: ['ADMIN', 'KE_TOAN'],
     element: (
       <ComingSoonPage
-        title="Phân hệ Quản lý & Thu hồi Công nợ"
-        phase="Phase 5 • Sprint 2"
-        description="Giám sát công nợ chưa nộp, nợ quá hạn theo mốc 30-60-90 ngày, tạo thông báo nhắc nợ tự động."
+        title="Phân hệ Theo dõi Công nợ"
+        description="Giám sát danh sách các hộ gia đình còn nợ phí và tổng hợp số tiền chưa thanh toán."
         features={[
-          'Báo cáo phân tích tuổi nợ (Aging of Accounts Receivable)',
-          'Tạo văn bản và email / SMS thông báo nhắc nợ phí chung cư',
-          'Lịch sử cam kết thanh toán của từng hộ gia đình',
+          'US21: Theo dõi danh sách các hộ gia đình còn nợ phí và quản lý công nợ',
         ]}
       />
     ),
   },
-  // Báo cáo & Thống kê (Phase 6)
+  // Phân hệ Báo cáo & Thống kê
   {
     path: '/reports',
     title: 'Báo cáo & Thống kê',
     icon: BarChart3,
     category: 'BÁO CÁO & HỆ THỐNG',
-    badge: 'Phase 6',
+    badge: 'Đang phát triển',
     element: (
       <ComingSoonPage
-        title="Phân hệ Báo cáo & Thống kê Toàn diện"
-        phase="Phase 6 • Sprint 2"
-        description="Tổng hợp doanh thu, tỷ lệ thu phí, biến động dân cư và xuất báo cáo tài chính định kỳ theo chuẩn quản lý chung cư."
+        title="Phân hệ Báo cáo & Thống kê"
+        description="Tổng hợp số liệu nhân khẩu, tình hình thu phí và xuất báo cáo tài chính."
         features={[
-          'Báo cáo thu - chi và quỹ đóng góp theo tháng/quý/năm',
-          'Biểu đồ trực quan tỷ lệ thanh toán và mật độ cư dân theo tầng/tháp',
-          'Xuất dữ liệu chuẩn Excel (.xlsx) và báo cáo in ấn PDF',
+          'US12: Thống kê số lượng nhân khẩu và biến động cư trú',
+          'US25: Thống kê tình hình thu phí và đóng góp theo kỳ',
+          'US26: Xuất báo cáo thu phí định kỳ ra định dạng Excel hoặc PDF',
         ]}
       />
     ),
   },
-  // Quản trị tài khoản (Phase 2)
+  // Phân hệ Quản trị Tài khoản Ban Quản Trị
   {
     path: '/users',
     title: 'Quản trị tài khoản',
     icon: ShieldCheck,
     category: 'BÁO CÁO & HỆ THỐNG',
+    badge: 'Đang phát triển',
     roles: ['ADMIN'],
     element: (
       <ComingSoonPage
-        title="Phân hệ Quản trị Tài khoản Ban Quản Trị"
-        phase="Phase 2 • Sprint 2"
-        description="Cấp phát tài khoản nội bộ cho các thành viên BQT, phân quyền vai trò (Admin, Kế toán, Cán bộ cư dân, Trưởng BQT) và theo dõi nhật ký hoạt động."
+        title="Phân hệ Quản trị Tài khoản BQT"
+        description="Cấp phát tài khoản, phân quyền vai trò cho thành viên BQT và theo dõi nhật ký kiểm toán."
         features={[
-          'Cấp mới tài khoản, phân quyền theo đúng vai trò nghiệp vụ',
-          'Đặt lại mật khẩu tạm thời & ép buộc đổi mật khẩu lần đầu',
-          'Nhật ký kiểm toán hệ thống (Audit Logs) truy vết mọi thao tác',
+          'US01: Tạo tài khoản đăng nhập cho thành viên Ban Quản Trị',
+          'US05: Xem danh sách, phân quyền vai trò, khóa tài khoản hoặc cấp lại mật khẩu',
+          'US06: Xem nhật ký kiểm toán (Audit Log) theo dõi lịch sử thao tác',
         ]}
       />
     ),
