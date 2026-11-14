@@ -19,7 +19,7 @@ export const mockStatistics: StatisticsResponse = {
     amountDue: 506000000,
     amountCollected: 428500000,
     amountRemaining: 77500000,
-    collectionRate: 84.6,
+    collectionRate: 84.7,
     householdsPaid: 296,
     householdsTotal: 342,
   },

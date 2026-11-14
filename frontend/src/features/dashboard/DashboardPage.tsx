@@ -78,12 +78,26 @@ export const DashboardPage: React.FC = () => {
   const byFee = mockStatistics.byFee ?? []
   const byCampaign = mockStatistics.byCampaign ?? []
 
+  // Tỷ lệ cư dân thường trú tính từ số liệu mockResidentOverview
+  const permanentResidentRate =
+    mockResidentOverview.totalResidents > 0
+      ? Math.round(
+          (mockResidentOverview.permanentResidents / mockResidentOverview.totalResidents) * 1000,
+        ) / 10
+      : 0
+
+  // Tỷ lệ thu tính trực tiếp từ số tiền amountCollected / amountDue (428.5 tr / 506 tr = 84.7%)
+  const collectionRate =
+    totals?.amountDue && totals.amountDue > 0
+      ? Math.round(((totals.amountCollected ?? 0) / totals.amountDue) * 1000) / 10
+      : (totals?.collectionRate ?? 0)
+
   return (
     <div className="space-y-6">
-      {/* Dải nhãn vàng theo yêu cầu: Dữ liệu mẫu — chưa kết nối API /api/stats */}
+      {/* Dải nhãn vàng: Dữ liệu mẫu — chưa kết nối API */}
       <div className="flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 shadow-xs">
         <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-        <span>Dữ liệu mẫu — chưa kết nối API /api/stats</span>
+        <span>Dữ liệu mẫu — chưa kết nối API</span>
       </div>
 
       {/* Welcome Banner */}
@@ -206,7 +220,10 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: '88%' }} />
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${permanentResidentRate}%` }}
+                />
               </div>
 
               <p className="mt-3 text-xs text-slate-500">
@@ -231,7 +248,7 @@ export const DashboardPage: React.FC = () => {
             <div className="mt-4">
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold tracking-tight text-slate-900">
-                  {totals?.collectionRate ?? 0}%
+                  {collectionRate}%
                 </span>
                 <span className="text-sm font-semibold text-slate-500">tỷ lệ thu</span>
                 <span className="ml-auto inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
@@ -242,7 +259,7 @@ export const DashboardPage: React.FC = () => {
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-indigo-600"
-                  style={{ width: `${totals?.collectionRate ?? 0}%` }}
+                  style={{ width: `${collectionRate}%` }}
                 />
               </div>
 
@@ -275,7 +292,7 @@ export const DashboardPage: React.FC = () => {
               <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-amber-500"
-                  style={{ width: `${100 - (totals?.collectionRate ?? 0)}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, 100 - collectionRate))}%` }}
                 />
               </div>
 
