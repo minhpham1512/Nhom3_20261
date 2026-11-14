@@ -142,141 +142,149 @@ export const DashboardPage: React.FC = () => {
 
       {/* KPI Metrics Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Căn hộ & Lấp đầy */}
-        <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-blue-200 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Căn hộ &amp; Lấp đầy
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
-              <Building2 className="h-5 w-5" />
+        {/* Card 1: Căn hộ & Lấp đầy (Hiện cho ADMIN, TRUONG_BQT, CAN_BO_CU_DAN) */}
+        {canAccessHouseholds && (
+          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-blue-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Căn hộ &amp; Lấp đầy
+              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
+                <Building2 className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold tracking-tight text-slate-900">
+                  {mockResidentOverview.occupiedApartments}
+                </span>
+                <span className="text-sm font-semibold text-slate-500">
+                  / {mockResidentOverview.totalApartments} căn
+                </span>
+                <span className="ml-auto inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                  {mockResidentOverview.occupancyRate}%
+                </span>
+              </div>
+
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-blue-600"
+                  style={{ width: `${mockResidentOverview.occupancyRate}%` }}
+                />
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                <strong className="text-slate-700">{mockResidentOverview.vacantApartments} căn trống</strong> • {mockResidentOverview.occupiedApartments} hộ đang ở
+              </p>
             </div>
           </div>
+        )}
 
-          <div className="mt-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold tracking-tight text-slate-900">
-                {mockResidentOverview.occupiedApartments}
+        {/* Card 2: Quy mô cư dân (Hiện cho ADMIN, TRUONG_BQT, CAN_BO_CU_DAN) */}
+        {canAccessHouseholds && (
+          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-emerald-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Nhân khẩu cư trú
               </span>
-              <span className="text-sm font-semibold text-slate-500">
-                / {mockResidentOverview.totalApartments} căn
-              </span>
-              <span className="ml-auto inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                {mockResidentOverview.occupancyRate}%
-              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-600 group-hover:text-white">
+                <Users className="h-5 w-5" />
+              </div>
             </div>
 
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-blue-600"
-                style={{ width: `${mockResidentOverview.occupancyRate}%` }}
-              />
-            </div>
+            <div className="mt-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold tracking-tight text-slate-900">
+                  {new Intl.NumberFormat('vi-VN').format(mockResidentOverview.totalResidents)}
+                </span>
+                <span className="text-sm font-semibold text-slate-500">cư dân</span>
+                <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                  <TrendingUp className="h-3 w-3" />
+                  +{mockResidentOverview.newResidentsThisWeek} tuần này
+                </span>
+              </div>
 
-            <p className="mt-3 text-xs text-slate-500">
-              <strong className="text-slate-700">{mockResidentOverview.vacantApartments} căn trống</strong> • {mockResidentOverview.occupiedApartments} hộ đang ở
-            </p>
-          </div>
-        </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: '88%' }} />
+              </div>
 
-        {/* Card 2: Quy mô cư dân */}
-        <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-emerald-200 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Nhân khẩu cư trú
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-600 group-hover:text-white">
-              <Users className="h-5 w-5" />
+              <p className="mt-3 text-xs text-slate-500">
+                <strong className="text-slate-700">{mockResidentOverview.permanentResidents}</strong> thường trú • <strong className="text-slate-700">{mockResidentOverview.temporaryResidents}</strong> tạm trú
+              </p>
             </div>
           </div>
+        )}
 
-          <div className="mt-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold tracking-tight text-slate-900">
-                {new Intl.NumberFormat('vi-VN').format(mockResidentOverview.totalResidents)}
+        {/* Card 3: Tiến độ thu phí tháng (Hiện cho STATS_ROLES: ADMIN, KE_TOAN, TRUONG_BQT) */}
+        {canViewStats && (
+          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-indigo-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Thu phí kỳ này
               </span>
-              <span className="text-sm font-semibold text-slate-500">cư dân</span>
-              <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                <TrendingUp className="h-3 w-3" />
-                +{mockResidentOverview.newResidentsThisWeek} tuần này
-              </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                <BadgeDollarSign className="h-5 w-5" />
+              </div>
             </div>
 
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-emerald-500" style={{ width: '88%' }} />
-            </div>
+            <div className="mt-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold tracking-tight text-slate-900">
+                  {totals?.collectionRate ?? 0}%
+                </span>
+                <span className="text-sm font-semibold text-slate-500">tỷ lệ thu</span>
+                <span className="ml-auto inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
+                  {totals?.householdsPaid ?? 0}/{totals?.householdsTotal ?? 0} hộ
+                </span>
+              </div>
 
-            <p className="mt-3 text-xs text-slate-500">
-              <strong className="text-slate-700">{mockResidentOverview.permanentResidents}</strong> thường trú • <strong className="text-slate-700">{mockResidentOverview.temporaryResidents}</strong> tạm trú
-            </p>
-          </div>
-        </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-indigo-600"
+                  style={{ width: `${totals?.collectionRate ?? 0}%` }}
+                />
+              </div>
 
-        {/* Card 3: Tiến độ thu phí tháng */}
-        <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-indigo-200 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Thu phí kỳ này
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
-              <BadgeDollarSign className="h-5 w-5" />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold tracking-tight text-slate-900">
-                {totals?.collectionRate ?? 0}%
-              </span>
-              <span className="text-sm font-semibold text-slate-500">tỷ lệ thu</span>
-              <span className="ml-auto inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
-                {totals?.householdsPaid ?? 0}/{totals?.householdsTotal ?? 0} hộ
-              </span>
-            </div>
-
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-indigo-600"
-                style={{ width: `${totals?.collectionRate ?? 0}%` }}
-              />
-            </div>
-
-            <p className="mt-3 text-xs text-slate-500">
-              Đã thu: <strong className="text-indigo-600">{formatCurrency(totals?.amountCollected ?? 0)}</strong>
-            </p>
-          </div>
-        </div>
-
-        {/* Card 4: Công nợ tồn đọng */}
-        <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-amber-200 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Công nợ cần thu
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition group-hover:bg-amber-600 group-hover:text-white">
-              <AlertTriangle className="h-5 w-5" />
+              <p className="mt-3 text-xs text-slate-500">
+                Đã thu: <strong className="text-indigo-600">{formatCurrency(totals?.amountCollected ?? 0)}</strong>
+              </p>
             </div>
           </div>
+        )}
 
-          <div className="mt-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-extrabold tracking-tight text-amber-600">
-                {formatCurrency(totals?.amountRemaining ?? 0)}
+        {/* Card 4: Công nợ tồn đọng (Hiện cho STATS_ROLES: ADMIN, KE_TOAN, TRUONG_BQT) */}
+        {canViewStats && (
+          <div className="group relative rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-amber-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Công nợ cần thu
               </span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition group-hover:bg-amber-600 group-hover:text-white">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
             </div>
 
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-amber-500"
-                style={{ width: `${100 - (totals?.collectionRate ?? 0)}%` }}
-              />
-            </div>
+            <div className="mt-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-extrabold tracking-tight text-amber-600">
+                  {formatCurrency(totals?.amountRemaining ?? 0)}
+                </span>
+              </div>
 
-            <p className="mt-3 text-xs text-slate-500">
-              <strong className="text-amber-700">{mockTodoTasks.debtReminder.unpaidHouseholdsCount} hộ chưa nộp</strong> • {mockTodoTasks.debtReminder.overdueHouseholdsCount} hộ quá hạn
-            </p>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-amber-500"
+                  style={{ width: `${100 - (totals?.collectionRate ?? 0)}%` }}
+                />
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                <strong className="text-amber-700">{mockTodoTasks.debtReminder.unpaidHouseholdsCount} hộ chưa nộp</strong> • {mockTodoTasks.debtReminder.overdueHouseholdsCount} hộ quá hạn
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Middle Row: Thống kê thu phí & Việc cần làm theo SDD SC003 */}
