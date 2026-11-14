@@ -40,6 +40,7 @@ model TaiKhoan {
   bienDongDaThucHien BienDongNhanKhau[]
   nhatKyThaoTac      NhatKyThaoTac[]
   phieuThuDaThu      PhieuThu[]
+  donGiaDaTao        LichSuDonGia[]
   vaiTro             VaiTro             @relation(fields: [vaiTroId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("tai_khoan")
@@ -144,15 +145,17 @@ model TamTruTamVang {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model KhoanThu {
-  id           Int          @id @default(autoincrement())
-  tenKhoanThu  String       @map("ten_khoan_thu") @db.VarChar(100)
-  loaiKhoanThu String       @map("loai_khoan_thu") @db.VarChar(30)
-  donGia       BigInt       @default(0) @map("don_gia")
-  donViTinh    String       @default("VND/m2/thang") @map("don_vi_tinh") @db.VarChar(20)
-  ngayApDung   DateTime     @default(dbgenerated("CURRENT_DATE")) @map("ngay_ap_dung") @db.Date
-  trangThai    String       @default("HOAT_DONG") @map("trang_thai") @db.VarChar(20)
+  id           Int            @id @default(autoincrement())
+  tenKhoanThu  String         @map("ten_khoan_thu") @db.VarChar(100)
+  loaiKhoanThu String         @map("loai_khoan_thu") @db.VarChar(30)
+  donGia       BigInt         @default(0) @map("don_gia")
+  donViTinh    String         @default("VND/m2/thang") @map("don_vi_tinh") @db.VarChar(20)
+  ngayApDung   DateTime       @default(dbgenerated("CURRENT_DATE")) @map("ngay_ap_dung") @db.Date
+  trangThai    String         @default("HOAT_DONG") @map("trang_thai") @db.VarChar(20)
+  phanLoai     String         @default("OTHER") @map("phan_loai") @db.VarChar(20)
   dotDongGop   DotDongGop[]
   phiPhaiNop   PhiPhaiNop[]
+  lichSuDonGia LichSuDonGia[]
 
   @@map("khoan_thu")
 }
@@ -164,6 +167,7 @@ model DotDongGop {
   tenDot          String            @map("ten_dot") @db.VarChar(150)
   ngayBatDau      DateTime          @map("ngay_bat_dau") @db.Date
   ngayKetThuc     DateTime          @map("ngay_ket_thuc") @db.Date
+  moTa            String?           @map("mo_ta")
   chiTietPhieuThu ChiTietPhieuThu[]
   khoanThu        KhoanThu          @relation(fields: [khoanThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -220,4 +224,18 @@ model ChiTietPhieuThu {
   phieuThu     PhieuThu    @relation(fields: [phieuThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("chi_tiet_phieu_thu")
+}
+
+model LichSuDonGia {
+  id          Int       @id @default(autoincrement())
+  khoanThuId  Int       @map("khoan_thu_id")
+  donGia      BigInt    @map("don_gia")
+  ngayHieuLuc DateTime  @map("ngay_hieu_luc") @db.Date
+  nguoiTaoId  Int?      @map("nguoi_tao_id")
+  ngayTao     DateTime  @default(now()) @map("ngay_tao") @db.Timestamptz(6)
+  khoanThu    KhoanThu  @relation(fields: [khoanThuId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoiTao    TaiKhoan? @relation(fields: [nguoiTaoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([khoanThuId, ngayHieuLuc], map: "unique_don_gia_ngay")
+  @@map("lich_su_don_gia")
 }

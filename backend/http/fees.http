@@ -1,0 +1,64 @@
+### Cần cài extension "REST Client" trong VS Code. Chưa có đăng nhập thật nên dùng header X-Dev-Role.
+@host = http://localhost:3000
+@role = KE_TOAN
+
+### Danh sách khoản thu
+GET {{host}}/api/fees?status=HOAT_DONG&page=1&pageSize=20
+X-Dev-Role: {{role}}
+
+### Chi tiết
+GET {{host}}/api/fees/1
+X-Dev-Role: {{role}}
+
+### Tạo khoản thu (đơn giá phí dịch vụ ngoài khung -> 409, thêm "confirmPriceWarning": true để lưu)
+POST {{host}}/api/fees
+X-Dev-Role: {{role}}
+Content-Type: application/json
+
+{
+  "name": "Phí gửi xe",
+  "type": "BAT_BUOC",
+  "category": "SERVICE_FEE",
+  "unitPrice": 20000,
+  "unit": "VND/m2/thang",
+  "billingCycle": "MONTHLY",
+  "effectiveFrom": "2026-12-01"
+}
+
+### Đổi đơn giá (tạo mốc mới)
+PATCH {{host}}/api/fees/1
+X-Dev-Role: {{role}}
+Content-Type: application/json
+
+{ "unitPrice": 6000, "effectiveFrom": "2027-01-01" }
+
+### Lịch sử đơn giá
+GET {{host}}/api/fees/1/prices
+X-Dev-Role: {{role}}
+
+### Ngừng áp dụng / kích hoạt lại
+PATCH {{host}}/api/fees/1/status
+X-Dev-Role: {{role}}
+Content-Type: application/json
+
+{ "status": "NGUNG_AP_DUNG" }
+
+### Danh sách đợt đóng góp
+GET {{host}}/api/contribution-campaigns?status=OPEN
+X-Dev-Role: {{role}}
+
+### Tạo đợt đóng góp
+POST {{host}}/api/contribution-campaigns
+X-Dev-Role: {{role}}
+Content-Type: application/json
+
+{
+  "name": "Quỹ Tết 2027",
+  "description": "Ủng hộ chương trình Tết cho cư dân",
+  "startDate": "2026-12-01",
+  "endDate": "2027-01-15"
+}
+
+### Chi tiết đợt
+GET {{host}}/api/contribution-campaigns/1
+X-Dev-Role: {{role}}
