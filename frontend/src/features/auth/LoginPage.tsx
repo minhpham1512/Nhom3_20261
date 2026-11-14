@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
-import { Lock, User, AlertCircle, ArrowRight, Eye, EyeOff, KeyRound, Sparkles } from 'lucide-react'
+import { Lock, User, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { isAxiosError } from 'axios'
 import { getApiErrorBody, getDetailString } from '../../lib/errors'
 
@@ -32,12 +32,6 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const handleFillDemo = (demoUser: string, demoPass: string) => {
-    setUsername(demoUser)
-    setPassword(demoPass)
-    setErrorMsg(null)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -173,32 +167,6 @@ export const LoginPage: React.FC = () => {
           )}
         </button>
       </form>
-
-      {/* Demo helper badge for convenience */}
-      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3.5">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span className="flex items-center gap-1.5 font-medium text-slate-300">
-            <KeyRound className="h-3.5 w-3.5 text-blue-400" />
-            Tài khoản mẫu:
-          </span>
-          <button
-            type="button"
-            onClick={() => handleFillDemo('admin', 'Admin@123')}
-            className="flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-semibold text-blue-400 transition hover:bg-blue-500/20"
-          >
-            <Sparkles className="h-3 w-3" />
-            Điền nhanh
-          </button>
-        </div>
-        <div className="mt-1.5 flex items-center justify-between font-mono text-xs text-slate-400">
-          <span>
-            user: <strong className="text-white">admin</strong>
-          </span>
-          <span>
-            pass: <strong className="text-white">Admin@123</strong>
-          </span>
-        </div>
-      </div>
     </div>
   )
 }
